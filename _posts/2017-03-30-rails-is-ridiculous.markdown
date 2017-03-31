@@ -50,14 +50,14 @@ From: /Users/andrew/3p/app3/lib/boundable.rb @ line 7 Boundable#lower_bound:
     12:   end
     13: end
 
-[1] pry(#<Time>)> self < bound
-=> true
-[2] pry(#<Time>)> self
-=> 2017-03-30 18:46:45 UTC
-[3] pry(#<Time>)> self.class
-=> Time
-[4] pry(#<Time>)> bound.class
-=> ActiveSupport::TimeWithZone
+self < bound
+# => true
+self
+# => 2017-03-30 18:46:45 UTC
+self.class
+# => Time
+bound.class
+# => ActiveSupport::TimeWithZone
 ```
 
 To summarize, the object returned by `Time.zone.now` is evaluating as less than `30.minutes.ago`, because when evaluating this line of code, `self` is being treated as a regular `Time` object, converted into UTC, and being evaluated numerically without knowldege of time zones.
@@ -65,7 +65,6 @@ To summarize, the object returned by `Time.zone.now` is evaluating as less than 
 Why on earth would that be? Let's sanity check how we're getting into this method:
 
 ```ruby
- => Thu, 30 Mar 2017 18:16:45 EDT -04:00
 Time.zone.now.method(:lower_bound).source_location
 # => nil
 Time.now.method(:lower_bound).source_location
@@ -74,7 +73,7 @@ Time.zone.now.method(:lower_bound).owner
 # => ActiveSupport::TimeWithZone
 ```
 
- So, there's no method source but there is an owner?? And there is a source for `Time`? We need more basic sanity checking:
+ So the owner is as expected but we can't find the source location?? Even though we can for `Time`? Shouldn't they be the same? We need more basic sanity checking:
 
 ```ruby
  Time.zone.now.class.superclass
@@ -89,6 +88,7 @@ Wait, but we cofirmed that `Time.zone.now.is_a?(Time)`, but the class does not s
 ```
 
 Ah, the dreaded "method_missing" pattern. I have found few valid uses of method_missing, and this is **NOT** one of them:
+
 ```ruby time_with_zone.rb
     # Send the missing method to +time+ instance, and wrap result in a new
     # TimeWithZone with the existing +time_zone+.
