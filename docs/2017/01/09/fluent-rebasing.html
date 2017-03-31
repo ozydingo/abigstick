@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>fluent rebasing</title>
+  <meta name="description" content="Recently, we’ve adopted rebasing into our git workflow. Because of this, we now enjoy clean, traceable, and roll-backable code history. Rebasing is great. Ho...">
+
+  <link rel="stylesheet" href="/assets/main.css">
+  <link rel="canonical" href="/2017/01/09/fluent-rebasing.html">
+  <link rel="alternate" type="application/rss+xml" title="Your awesome title" href="/feed.xml">
+  
+  
+</head>
+
+
+  <body>
+
+    <header class="site-header" role="banner">
+
+  <div class="wrapper">
+
+    <a class="site-title" href="/">Your awesome title</a>
+
+    <nav class="site-nav">
+      <span class="menu-icon">
+        <svg viewBox="0 0 18 15" width="18px" height="15px">
+          <path fill="#424242" d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z"/>
+          <path fill="#424242" d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z"/>
+          <path fill="#424242" d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z"/>
+        </svg>
+      </span>
+
+      <div class="trigger">
+        
+          
+          <a class="page-link" href="/about/">About</a>
+          
+        
+          
+        
+          
+        
+          
+        
+      </div>
+    </nav>
+
+  </div>
+
+</header>
+
+
+    <main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title" itemprop="name headline">fluent rebasing</h1>
+    <p class="post-meta"><time datetime="2017-01-09T11:02:11-05:00" itemprop="datePublished">Jan 9, 2017</time></p>
+  </header>
+
+  <div class="post-content" itemprop="articleBody">
+    <p>Recently, we’ve adopted <a href="https://git-scm.com/book/en/v2/Git-Branching-Rebasing">rebasing</a> into our git workflow. Because of this, we now enjoy clean, traceable, and roll-backable code history. Rebasing is great. However, it comes with a few issues, which I will call “rebase trolls”. Rebase trolls love to hide out in long-running branches, waiting to make a mockery of your best intentions when you suggest “hey, we should rebase this branch first before merging it into master”.</p>
+
+<p>The aim of this post is not to convince you to rebase. No, I only intend to arm you with the necessary tools to easily smack down these rebasing trolls. Starting with some of the simpler cases and progress onto the complications that inevitably arise as specs evolve and bugs are discovered, you should ultimately feel that rebasing is (almost) as easy as straight merging.</p>
+
+<p>In all of the commands below, you can always replace refs such as <code class="highlighter-rouge">master</code>, <code class="highlighter-rouge">head</code>, with any other git ref. I have used example refs of <code class="highlighter-rouge">master</code> and <code class="highlighter-rouge">head</code> when this is likely how you will usually use them.</p>
+
+<h1 id="basic-rebasing">Basic Rebasing</h1>
+
+<p>There’s a lot of well-writtenand concise info on rebasing in the <a href="https://git-scm.com/book/en/v2">git book</a>. Get to know <a href="https://git-scm.com/book/en/v2/Git-Branching-Rebasing">basic rebasing</a>, the <a href="https://git-scm.com/docs/git-push">–force</a> flag, and <a href="https://git-scm.com/book/en/v2/Git-Tools-Rewriting-History">commit squashing</a> as a baseline. In a nutshell,  <code class="highlighter-rouge">git rebase master</code> takes your branch and makes-believe that you started that branch on current master. But because belief is reality, it also make it so. What you get is then a simple, step-by-step, linear history of commits to <code class="highlighter-rouge">master</code> without complicated forks and dependencies.</p>
+
+<p>[image1: basic rebase]</p>
+
+<p>With <a href="https://git-scm.com/book/en/v2/Git-Tools-Rewriting-History">interactive rebasing</a>, you can also clean up your branch: you can combine multiple commits, re-order commits, and generally manipulate a branch. Why? To make your commits more useful when you other other developers need to look back at, or revert to, this chapter in your code’s history. Away with you, commit messages of “beh”! Now each commit can fully represent a meaningful code change that can be understood at a glance.</p>
+
+<p>As you become more fluent with rebasing, you gain a new perspective on your code. Instead of a bag of files, your code base also becomes a series of meaningful commits. Merging into master evolves from “shove my files into master” into “apply my feature change(s) on top of the current commit stack”. Personally, I find this perspective to be enormously useful when planning how to combine mulitple long-running feture branches into a major code release.</p>
+
+<p>[image2: rebase with reorder (fixup) and squash]</p>
+
+<h1 id="rebasing-issues">Rebasing Issues</h1>
+
+<p>Rebasing has a learning curve. But if you commit (heh) to it, it’s really not hard to get over it.</p>
+
+<p>The most common issue rebasing newbies encounter is basically a really annoying and persistent merge conflict. Bad commit habits can turn merge conflicts from merely annoying to a huge pain in the ass when rebasing is involved. These are always defeatable, and also preventable. First, let’s understand what’s happening.</p>
+
+<p>When you rebase a long series of commits, git redoes each commit sequentially, dealing with any issues one commit at a time. So on a branch with 25 new commits, a merge conflict on commit 1 if not resolved smartly can become a merge conflict in commit 2, and 3, and so on. The “undying merge conflict”. Nobody wins.</p>
+
+<p>For example, if you change a block of code that was moved on master, you get a merge conflict. You resolve this by moving your changed block of code to where it was moved to on master. But you changed that same block of code again in the next commit. New merge conflict.</p>
+
+<p>Another common issue is the cloned commit. Rebasing a commit necessarily changes it, so if you merge a branch that contains commits that are rebased version of old commits you already have, you will get both sets of commits. This issue and some of its solutions are well described in the <a href="https://git-scm.com/book/en/v2/Git-Branching-Rebasing">git book</a>.</p>
+
+<p>In the following sections, we will discuss (1) prevention of these issues, (2) how to deal with them if you failed to prevent them, and (3) your safety net should you get in over your head when trying to solve these issues.</p>
+
+<h1 id="prevention">Prevention</h1>
+
+<p>The best offense is a good defense, so let us take our battle right to the home of the rebase trolls. Keep your branch clean. Use helpful commit messages. You may not want to spend the 2 seconds it takes to remember what you just did, but when shit hits the fan you will be very glad you did. You might even get a little boost in code strategy organiation while you’re at it!</p>
+
+<p>Here are some tools to help you that you might not be familiar with if you’re new to rebasing.</p>
+
+<h2 id="1-clean-up-your-commits">1. Clean up your commits</h2>
+
+<p>The lowest hanging fruit here are the extra commits you make to quickly fix up a quick typo or similar: the dreaded “beh” commit (with messages like “beh” or “oops” or “fixed”). These commits do not belong in your history; get rid of them! When battling the undying merge conflict, if you’re weighed down by carrying 23 “beh” commits with you, the rebase troll is going to win.</p>
+
+<p>Before we go on, the following can never be stated enough times. Other developers working on your code need to all be in sync when rewrite / rebase commits. Rebase trolls are sneaky bastards: if you vanquish them from your branch they will look for any opportunity to hop onto someone else’s local copy of that branch. Don’t let them! If anyone else has a copy of a branch you wish to rebase, make sure they delete or <a href="#reset">fetch and reset</a> their branch before they do anything else!</p>
+
+<p>That said, here are some of the tools you can use to clean up your branch and diminish the rebase trolls’ power.</p>
+
+<p><a name="amend" id="amend"></a>
+<code class="highlighter-rouge">git commit --amend --no-edit</code> - immediately squash the current staged changes into the last commit (<code class="highlighter-rouge">--amend</code>) and use its commit message (<code class="highlighter-rouge">--no-edit</code>). Use this when you want to make a quick change to the last commit (that isn’t yet on master or anyone else’s machine)</p>
+
+<p><a name="fixup" id="fixup"></a>
+<code class="highlighter-rouge">git commit --fixup $sha</code> - Make a new commit, but mark it as an amendment (with no message changes) to the commit specified by <code class="highlighter-rouge">$sha</code>. Use this is you want to modify an earlier commit but aren’t prepared to actually modify that commit yet, maybe because someone else is also working on the same branch.</p>
+
+<p><a name="fixup" id="fixup"></a>
+<code class="highlighter-rouge">git commit --squash $sha</code> - Like <code class="highlighter-rouge">--fixup</code>, but prompt for a new commit message when you squash the commits together.</p>
+
+<p><a name="autosquash" id="autosquash"></a>
+<code class="highlighter-rouge">git rebase -i --autosquash $ref</code> - Do an interactive rebase, but automatically reorder and set to fixup / squash any commits that are marked to do so. Here, the <code class="highlighter-rouge">--autosquash</code> is only helpful if you’ve marked any commits as <code class="highlighter-rouge">--fixup</code> or <code class="highlighter-rouge">--squash</code> commits.</p>
+
+<h2 id="2-make-sensible-commits">2. Make sensible commits</h2>
+
+<p>When you view your code base as a bag of files instead of a series of commits, a quick typo fix can go anywhere in your commit history. But when you take on the series-of-commits viewpoint, though, you’ll quickly learn to insist that those commits be by themselves or squashed into the original commit. Otherwise you just won’t feel like all is right in the world.</p>
+
+<p>Why? Because rebasing, AKA manipulating commits, is difficult when the commits themselves don’t actually represent any coherent set of changes. Not just because you don’t know which change is where, but because commits littered with fixes to other commits introduces dependencies to those commits, and reordering or cherry picking commits becomes difficult or impossible. So commit wisely, and avoid the rebase trolls!</p>
+
+<p><code class="highlighter-rouge">git add $file1 $file2 ...</code> - add only specified files to the changes staged for commit. You likely already know this one, but may largely use the <code class="highlighter-rouge">git add .</code> form (“add everything”). Be more specific! Need to make a quick unrelated fix in the middle of your feature branch? <code class="highlighter-rouge">git add $that_file; git commit -m 'fix that_file'</code>.</p>
+
+<p>Did you make a quick fix on a file that you have other changes on for your branch?</p>
+
+<p><a name="add" id="add"></a>
+<code class="highlighter-rouge">git add -p</code> (or <code class="highlighter-rouge">--patch</code>) - select specific sections of code changes to stage for commit.
+<code class="highlighter-rouge">git add -i</code> (or <code class="highlighter-rouge">--interactive</code>, from which you can enter <code class="highlighter-rouge">patch</code> mode)</p>
+
+<p>Using the patch tool, you are provocatively asked for each section of code that has changed if you want to “stage this hunk?”. Here, you can answer “yes” only to the hunks that are the typo fix, commit those changes (using <code class="highlighter-rouge">--fixup</code> if you so choose), then continue coding as if nothing had interrupted your flow. You can also use the <code class="highlighter-rouge">s</code> command to split a hunk into smaller sections if the quick fix you’re looking to add is only a piece of the current hunk. Hunk hunk hunk. Great word.</p>
+
+<h2 id="3-be-aware-of-your-environment">3. Be aware of your environment</h2>
+
+<p>Visibility is key to avoiding traps, so knowing how to easily detect lurking rebase trolls can help you vanquish them. For this, you’ll first want to make liberal use of <code class="highlighter-rouge">git log</code>. Here are a few forms of <code class="highlighter-rouge">git log</code> that can be helpful when preparing for battle.</p>
+
+<p><a name="log" id="log"></a><code class="highlighter-rouge">git log --graph</code> - show a graphical represnetation of existing commits and their parent commits.
+<code class="highlighter-rouge">git log master..head</code> - show commits that exist on <code class="highlighter-rouge">head</code> but not on <code class="highlighter-rouge">master</code>. What happens if you switch <code class="highlighter-rouge">head</code> and <code class="highlighter-rouge">master</code>?
+<code class="highlighter-rouge">git show $sha</code> - show the changes made by <code class="highlighter-rouge">$sha</code>.</p>
+
+<p><a name="cherry" id="cherry"></a>
+<code class="highlighter-rouge">git cherry master head</code> will show you just the sha’s of the commits on <code class="highlighter-rouge">head</code> and not <code class="highlighter-rouge">master</code>. Here, the second ref (<code class="highlighter-rouge">head</code>) is optional and defaults to <code class="highlighter-rouge">head</code>.</p>
+
+<p><a name="name-status" id="name-status"></a>
+<code class="highlighter-rouge">git diff --name-status</code> - view just the file names that have been modified or added, each with a “M” or “A” to indicate which. Using the default refs essentially gives you the same as <code class="highlighter-rouge">git status</code>, but with <code class="highlighter-rouge">diff</code> you can view this form between any two git refs.
+<code class="highlighter-rouge">git show $sha --name-status</code> - the same for a single commit using <code class="highlighter-rouge">git show</code>
+<code class="highlighter-rouge">git log --name-status</code> - the same for <code class="highlighter-rouge">git log</code></p>
+
+<h1 id="battle">Battle</h1>
+
+<p>Even after you’ve mastered the above, you will still have to battle the rebase trolls from time to time. When you do, here are some weapons that will help you on your journey.</p>
+
+<h2 id="1-squash-commits-without-rebasing-on-the-latest-master">1. Squash commits without rebasing on the latest master</h2>
+
+<p>If you know you’re about to fight an undying merge conflict across several commits, you could squash all of these commits first to make your battle easier. However, if you’ve already fetched <code class="highlighter-rouge">master</code> from your remote, any attempt to rebase off of master enters you directly into the battle. You need:</p>
+
+<p><a name="merge-base" id="merge-base"></a>
+<code class="highlighter-rouge">git merge-base master head</code> - Don’t perform any operations, but print out the commit sha where <code class="highlighter-rouge">master</code> diverges from <code class="highlighter-rouge">head</code>. This should be the commit where you where on <code class="highlighter-rouge">master</code> when you created this branch. You will want to rebase off of this commit instead of master to temporarily avoid dealing with any recent changes to master.</p>
+
+<p><code class="highlighter-rouge">git rebase -i --autosquash $(git merge-base master head)</code> - do the above in one line, if you’re using bash (the <code class="highlighter-rouge">$(...)</code> gets evaluated and inserted by bash before executing the rest of the command).</p>
+
+<h2 id="2-better-understand-a-merge-conflict">2. Better understand a merge conflict</h2>
+
+<p>When you are resolving a merge conflict, git’s default two-sided (<code class="highlighter-rouge">&lt;&lt;&lt;&lt;&lt;&lt;</code> vs <code class="highlighter-rouge">&gt;&gt;&gt;&gt;&gt;&gt;</code>) merge conflict markers sometimes leave you without knowing what changed on <code class="highlighter-rouge">master</code> that you are trying to resolve. To get a better view, use</p>
+
+<p><a name="conflict" id="conflict"></a>
+<code class="highlighter-rouge">git checkout --conflict=diff3 $file_with_merge_conflict</code> - checkout the conflicted file with an additional merge conflict marker (<code class="highlighter-rouge">|||||||</code>) that shows you what the original form of the code was before either branch modified it. I like this view enough to make it my default.</p>
+
+<p><code class="highlighter-rouge">git config --global merge.conflictstyle diff3</code> - make the above your default.</p>
+
+<p><a name="ours-theirs" id="ours-theirs"></a>
+<code class="highlighter-rouge">git checkout --ours $file</code> - blow away the other branch’s file in favor of yours.
+<code class="highlighter-rouge">git checkout --theirs $file</code> - blow away your own file in favor of the other branch’s.</p>
+
+<h2 id="3-build-a-new-branch">3. Build a new branch</h2>
+
+<p>Branches are transient, commits in master are forever. Sometimes the easiest way to dodge a horde of rebase trolls is simply to prepare a new branch off of master. With the right tools, this is quite trivial: you simply need to select the commits and/or patches that you want on your clean branch, no messing with the code required.</p>
+
+<p><a name="cherry-pick" id="cherry-pick"></a>
+<code class="highlighter-rouge">git cherry-pick $sha</code> - apply the commit specified by <code class="highlighter-rouge">$sha</code> on top of your current head. You may want to use then when someone (including yourself) has made a commit on a separate branch that you want to incorporate into your branch without a whole merge and/or rebase dance.</p>
+
+<p><a name="apply" id="apply"></a>
+<code class="highlighter-rouge">git apply $diff_file</code> - apply the diff contained in <code class="highlighter-rouge">$diff_file</code> as unstaged changes on your current head. You can easily generate such a diff using <code class="highlighter-rouge">git diff ref &gt; $diff_file</code></p>
+
+<p>Maybe you’re at your wit’s end. You want to apply your changes in one fell swoop as a single commit, feature differentiation be damned, and move on with your life. There’s a tool for that.</p>
+
+<p><a name="merge-squash" id="merge-squash"></a>
+<code class="highlighter-rouge">git merge --squash $feature_branch</code> - the nuclear option. Pretend like you’re doing a merge, but all changes are left as unstaged instead of preserving any commits or their parents. In other words, make all the necessary changes to files that you need to get your current branch into the state it would be in after a merge of <code class="highlighter-rouge">$feature_branch</code>. You can then add and commit as normal. This way, you can very easily avoid any rebase trolls, but still integrate your feature branch in a linear series of commits.</p>
+
+<p>For example, you could use this to build a clone of your feature branch that is now ready for a simple fast-forward merge pull request:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>[feature] $ git checkout master
+[master] $ git pull
+[master] $ git checkout -b feature_new
+[feature_new] $ git merge --squash feature
+[feature_new] $ git add .
+[feature_new] $ git commit -m "My feature in one commit"
+</code></pre>
+</div>
+
+<p>Of course, you can also use <code class="highlighter-rouge">git add $files</code> or <code class="highlighter-rouge">git add -p</code> to build a more granular commit history.</p>
+
+<h1 id="retreat">Retreat!!</h1>
+
+<p>In any battle, it helps to know you have a safe way out. Git gives you multiple.</p>
+
+<p><a name="abort" id="abort"></a>
+<code class="highlighter-rouge">git rebase --abort</code> - run away! This rebase has become to sticky and I want to try something else.
+<a name="reset" id="reset"></a>
+<code class="highlighter-rouge">git reset --hard $ref</code> - completely revert the state of my current branch to <code class="highlighter-rouge">$ref</code>.
+<a name="clean" id="clean"></a>
+<code class="highlighter-rouge">git clean -df</code> - after a reset, if you have untracked / new files or directories you also need to reset, this will get rid of them.</p>
+
+<p>A common form of the retreat is <code class="highlighter-rouge">git reset --hard origin/$branch_name</code>. This will completely blow away any local changes you have on your branch and set your branch to the copy on origin. The end result is the same as if you deleted your local branch and checked out the remote branch. Note that you still need to <code class="highlighter-rouge">git fetch</code> if there are changes that were pushed up since your last <code class="highlighter-rouge">fetch</code>.</p>
+
+<h1 id="victory-over-the-rebase-trolls">Victory over the Rebase Trolls</h1>
+
+<p>Hopefully you have a budding comfort now with rebasing and the tools and weapons you have to vanquish the rebase trolls. As you continue on your journey, know that these trolls have no power over your code workflow and cannot stand in your way to beautiful code. Godspeed, good coder. Godspeed.</p>
+
+<p>Have any other rebasing issues you come up against? Did I say something stupid? Let me know in the comments below!</p>
+
+  </div>
+
+  
+</article>
+
+      </div>
+    </main>
+
+    <footer class="site-footer">
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading">Your awesome title</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li>
+            
+              Your awesome title
+            
+            </li>
+            
+            <li><a href="mailto:your-email@domain.com">your-email@domain.com</a></li>
+            
+        </ul>
+      </div>
+
+      <div class="footer-col footer-col-2">
+        <ul class="social-media-list">
+          
+          <li>
+            <a href="https://github.com/jekyll"><span class="icon icon--github"><svg viewBox="0 0 16 16" width="16px" height="16px"><path fill="#828282" d="M7.999,0.431c-4.285,0-7.76,3.474-7.76,7.761 c0,3.428,2.223,6.337,5.307,7.363c0.388,0.071,0.53-0.168,0.53-0.374c0-0.184-0.007-0.672-0.01-1.32 c-2.159,0.469-2.614-1.04-2.614-1.04c-0.353-0.896-0.862-1.135-0.862-1.135c-0.705-0.481,0.053-0.472,0.053-0.472 c0.779,0.055,1.189,0.8,1.189,0.8c0.692,1.186,1.816,0.843,2.258,0.645c0.071-0.502,0.271-0.843,0.493-1.037 C4.86,11.425,3.049,10.76,3.049,7.786c0-0.847,0.302-1.54,0.799-2.082C3.768,5.507,3.501,4.718,3.924,3.65 c0,0,0.652-0.209,2.134,0.796C6.677,4.273,7.34,4.187,8,4.184c0.659,0.003,1.323,0.089,1.943,0.261 c1.482-1.004,2.132-0.796,2.132-0.796c0.423,1.068,0.157,1.857,0.077,2.054c0.497,0.542,0.798,1.235,0.798,2.082 c0,2.981-1.814,3.637-3.543,3.829c0.279,0.24,0.527,0.713,0.527,1.437c0,1.037-0.01,1.874-0.01,2.129 c0,0.208,0.14,0.449,0.534,0.373c3.081-1.028,5.302-3.935,5.302-7.362C15.76,3.906,12.285,0.431,7.999,0.431z"/></svg>
+</span><span class="username">jekyll</span></a>
+
+          </li>
+          
+
+          
+          <li>
+            <a href="https://twitter.com/jekyllrb"><span class="icon icon--twitter"><svg viewBox="0 0 16 16" width="16px" height="16px"><path fill="#828282" d="M15.969,3.058c-0.586,0.26-1.217,0.436-1.878,0.515c0.675-0.405,1.194-1.045,1.438-1.809c-0.632,0.375-1.332,0.647-2.076,0.793c-0.596-0.636-1.446-1.033-2.387-1.033c-1.806,0-3.27,1.464-3.27,3.27 c0,0.256,0.029,0.506,0.085,0.745C5.163,5.404,2.753,4.102,1.14,2.124C0.859,2.607,0.698,3.168,0.698,3.767 c0,1.134,0.577,2.135,1.455,2.722C1.616,6.472,1.112,6.325,0.671,6.08c0,0.014,0,0.027,0,0.041c0,1.584,1.127,2.906,2.623,3.206 C3.02,9.402,2.731,9.442,2.433,9.442c-0.211,0-0.416-0.021-0.615-0.059c0.416,1.299,1.624,2.245,3.055,2.271 c-1.119,0.877-2.529,1.4-4.061,1.4c-0.264,0-0.524-0.015-0.78-0.046c1.447,0.928,3.166,1.469,5.013,1.469 c6.015,0,9.304-4.983,9.304-9.304c0-0.142-0.003-0.283-0.009-0.423C14.976,4.29,15.531,3.714,15.969,3.058z"/></svg>
+</span><span class="username">jekyllrb</span></a>
+
+          </li>
+          
+        </ul>
+      </div>
+
+      <div class="footer-col footer-col-3">
+        <p>Write an awesome description for your new site here. You can edit this line in _config.yml. It will appear in your document head meta (for Google search results) and in your feed.xml site description.
+</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+
+
+  </body>
+
+</html>
