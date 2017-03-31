@@ -1,0 +1,181 @@
+---
+layout: post
+title: "subjoins"
+date: 2016-09-21 22:55:36 -0400
+comments: true
+categories: 
+---
+
+## Join from a parent class to associations defined in subclasses.
+
+<a href="#tl-dr-subjoins">tl; dr</a>
+
+I use [single table inheritance](http://eewang.github.io/blog/2013/03/12/how-and-when-to-use-single-table-inheritance-in-rails/). A lot. Maybe more than I should. But that's not the point.
+
+We have a `User` class, that has subclasses such as `Admin`, `Contractor`, and `Client`. `Contractor` has an association: `has_one :profile`, which contains some useful info. Often times I'll be accessing a whole bunch of Users that I know are all Contractors. Say, `project.users.where(type: "Contractor")`. Well doesn't it make sense at this point that I should be able to join to `:profile` now that I'm dealing with only `Contractor`s?
+
+Well for this basic case, that's really quite easy: `Contractor.all.merge(project.users).joins(:profile)`
+
+In fact, we can easily make this another [secret extension](blog/2016/06/03/secret/):
+
+```ruby active_record_extension.rb
+    def as_subclass(subclass)
+      subclass.all.merge(self.all)
+    end
+```
+
+Great! We're done here.
+
+Or are we?
+
+So you might have noticed that this method will in fact force the `type == 'Contractor'` requirement on your query even if you didn't do so youself. Well now that gets me thinking. Can we `LEFT JOIN` to profile on a collection of `User`s that aren't all `Contractor`s? That is, `User`s that happen to be `Contractor`s (and have a profile, which is all of them) will get joins to a `:profile` record, while others will have `NULL` for those joined columns.
+
+Why, yes. Yes we can. Once again we will make heavy use of [arel](http://jpospisil.com/2014/06/16/the-definitive-guide-to-arel-the-sql-manager-for-ruby.html), to the point that even this link doesn't cover all of what we need to know. To the point that I'm still not quite sure what to do about through associations, but maybe I'll come back another time to update this post when I figure that out.
+
+<a name="tl-dr-subjoins"></a>
+
+```ruby
+User.activate_secret_extensions.subjoins(:profile).to_sql
+# => "SELECT `users`.* FROM `users` 
+#     LEFT OUTER JOIN `admin_profiles` ON `users`.`type` IN ('Admin') AND `admin_profiles`.`user_id` = `users`.`id` 
+#     LEFT OUTER JOIN `contractor_profiles` ON `users`.`type` IN ('Contractor') AND `contractor_profiles`.`user_id` = `users`.`id`
+#     WHERE (users.deleted = false)"
+```
+
+Oh, did I mention that `Admin` also has a `:profile` assocaition too that is defined differently using a different table? And that this solution `LEFT JOIN`s to both tables appropriately? Oh, no? Well it does.
+
+Here's how we accomplish this:
+
+```ruby active_record_extension.rb
+    # currently does not work with :through associations
+    def subjoins(association)
+      associations = descendants.map{|klass| [klass, klass.reflect_on_association(association)]}.to_h.select{|klass, assoc| assoc.present?}
+      associations.keys.none?{|assoc| assoc.is_a?(ActiveRecord::Reflection::ThroughReflection)} or raise NotImplementedError, "NIY for through associations"
+
+      bind_values = []
+      arel = self.all.arel
+      associations.group_by{|klass, assoc| assoc.klass.base_class}.each do |foreign_klass, assocs|
+        conditions = assocs.map do |klass, assoc|
+          join_arel = klass.joins(assoc.name).arel
+          join_condition = join_arel.join_sources.last.right.expr
+          bind_values += join_arel.bind_values
+          self.arel_table[self.inheritance_column].in([klass.name, *klass.subclasses.map(&:name)]).and(join_condition)
+        end.reduce(&:or)
+
+        arel = arel.join(foreign_klass.arel_table, Arel::Nodes::OuterJoin).on(conditions)
+      end
+      result = self.all
+      result = result.joins(*arel.join_sources) if arel.join_sources.present?
+      bind_values.each{|val| result = result.bind(val)}
+      return result
+    end
+  end
+```
+
+Let's break this down.
+
+Considering only `Contractor` for the moment, We want to do a `LEFT JOIN` on `contractor_profiles` where the user is a `Contractor` AND the profile's `user_id` matches.
+
+Generalizing, we need to find the subclass, or subclasses, that contain the association named `:profile`, and to a `LEFT JOIN` for each associations. Like I often do, I'm going to make Rails do the heavy lifting of generating the join conditions, and I'll step in only to direct the orchestra of hack. So where do we start?
+
+```ruby
+associations = descendants.map{|klass| [klass, klass.reflect_on_association(association)]}.to_h.select{|klass, assoc| assoc.present?}
+```
+
+This selects descendants that have the named assocaition (via the awesomely named `reflect_on_association` method, which safely returns `nil` when the association is not defined). The output here is a Hash where the keys are subclasses and the values are the associations: `{Contractor => #<assocation>, Admin => #<association>}`
+
+Now that we have the full list of associations linked to each subclass, we need to combine them. As the full solution hinted, we need to combine the join conditions (e.g. `contracotor_profiles.user_id = users.id`) with the condition that `users.type = 'Contractor'`. Or, more throughly, `users.type IN (#{list of Contractor subtypes})`. This is acomplished via the line
+
+```ruby
+self.arel_table[self.inheritance_column].in([klass.name, *klass.subclasses.map(&:name)]).and(join_condition)`
+```
+
+Here, the part before the `and` gives us the type condition, but using the inheritance column because it's possible to set that to something other than `"type"`. It finds all the subclasses and dumps them into the the `IN` operator as we said we should. Note that in your developemnt environment, due to lazy-loading, this list is empty until you explicitly load subclasses, so you have to do that first for this to work. Simply instantiate their classes and Rails will do that for you.
+
+After the `and`, we use `join_condition`, which is defined above. Specifically, it is the correct join condition generated by `Contractor.joins(:profile)`. Letting Rails do the correct generation of that join condition depending on the association type, we can get that using
+
+```ruby
+join_arel = klass.joins(assoc.name).arel
+join_condition = join_arel.join_sources.last.right.expr
+```
+
+Now what's up with `last.right.expr`? To be honest, this is something of a best guess. As far as I can tell, `join_sources` is an array with one element per table joined table. For a direct (not `:through`) associations, this seems to be a 1-element Array. For a `:through` associations, the intermediate tables come first. So while we're not yet supporting through associations, I'm just going to remind myself of that by selecting `join_sources.last`. From here, we have `left` and `right`, where  `joins_sources.last.left` is the arel table being joined to, and `joins_sources.last.right` is the condition ON which this join is predicated. To illustrate:
+
+```ruby
+Contractor.joins(:profile).join_sources.last.right.to_sql
+# => "ON `contractor_profiles`.`user_id` = `users`.`id`"
+```
+
+This is the part we want, so this is the part we've taken. Lastly, we need just the expression without the `ON` operator, since we're going to use that operator ourselves. Thus, `join_arel.join_sources.last.right.expr`.
+
+```ruby
+Contractor.joins(:profile).join_sources.last.right.expr.to_sql
+ => "`contractor_profiles`.`user_id` = `users`.`id`"
+```
+
+So that's how we get the join conditions for each assocaition, combining a type condition with the appropriate join condition for that type, and storing this new combination in the variable `conditions`. We then add this to the join stack using 
+
+```ruby
+arel = arel.join(foreign_klass.arel_table, Arel::Nodes::OuterJoin).on(conditions)
+```
+
+where `foreign_klass` is the class of the association, defined by the outer loop.
+
+Ok so what the heck is the outer loop?
+
+`associations.group_by{|klass, assoc| assoc.klass.base_class}` groups all the the descendants' assocations by their base_class. This accounts for the fact that some subclasses' associations by the same name could be to the same table, where only one `JOIN` is needed for the group of them. In our first example with `AdminProfile` vs `ClientProfile` case, these were different tables, and we needed a `JOIN` for each. To illustrate the case for grouping, consider two subclasses of a `Service` class: `TrancsriptionService` and `AlignmentServivce`. Both of these have an `:output_transcript` association, defined separately, but both of these associations are of the `Transcript` class:
+
+```ruby
+Service.activate_secret_extensions.subjoins(:output_transcript).to_sql
+# => SELECT `services`.* FROM `services`
+#    LEFT OUTER JOIN `transcripts` ON (
+#      `services`.`type` IN ('AlignmentService') AND `transcripts`.`service_id` = `services`.`id` AND `transcripts`.`type` IN ('AlignedTranscript') AND `transcripts`.`archived` = 0 
+#    OR
+#      `services`.`type` IN ('TranscriptionService') AND `transcripts`.`service_id` = `services`.`id` AND `transcripts`.`type` IN ('TranscribedTranscript') AND `transcripts`.`archived` = 0
+#    )
+#    WHERE (services.deleted = 0)
+```
+
+Notice that only one `LEFT OUTER JOIN` was generated for this example, but that the conditions for the two associations were `OR`'d together using the `reduce(&:or)`, allowing us to join to both association types in the same `JOIN`. This is because we've collected all the join_conditions for the group associatied with the `Transcript` base_class and imposed them all in one go. Go us!
+
+Piecing it all together, we return `self.all.joins(*arel.join_sources)` at the end, and this gives us our grand total joins query that accounts for the subclass-specific associations! (Though we're safe about it and only do the joins if there are things to join to -- ActiveRecord will complian otherwise.)
+
+Ok, one last thing. What are these `bind_values`? Well, you may have noticed a few default scopes in the last example: `archived = 0` and `deleted = 0`. These are generated using "bind values", which I am very unable to find good documentation on. However, notice:
+
+```ruby
+ TranscriptionService.joins(:output_transcript).arel.join_sources.last.to_sql
+ # => "INNER JOIN `threeplay_transcripts` ON `threeplay_transcripts`.`service_id` = `services`.`id` AND `threeplay_transcripts`.`type` IN ('TranscribedTranscript') AND `threeplay_transcripts`.`archived` = ?"
+```
+
+we have a missing value for `archived` here. Well, with much poking around, I found it here:
+
+```ruby
+ TranscriptionService.joins(:output_transcript).arel.bind_values
+ # => [[#<ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter::Column:0x007fb89daaca50 @strict=true, @collation=nil, @extra="", @name="archived", @cast_type=#<ActiveRecord::Type::Boolean:0x007fb8a7a89320 @precision=nil, @scale=nil, @limit=1>, @sql_type="tinyint(1)", @null=true, @default="0", @default_function=nil>, false]]
+```
+
+The first value here is some label for the bind value, and the last, `false`, is the value we actually need. And the only way I can figure out how to use this value is in ActiveRecord, not Arel, so we collect these bind_values in the inner loop (`bind_values += join_arel.bind_values`), and use them all in one go at the very end using
+
+```ruby
+ bind_values.each{|val| result = result.bind(val)}
+```
+
+This seems to work, though I have a very poor understanding of how robustly.
+
+The last thing I'll note about bind values is that while these bind values came from the Arel object, there are cases where you can only get them from the ActiveRecord object:
+
+```ruby
+ TranscriptionService.where(state: "ready").arel.bind_values
+ # => []
+ TranscriptionService.where(state: "ready").bind_values
+ #=> [[#<ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter::Column:0x007fb89c7c8510 @strict=true, @collation="utf8_general_ci", @extra="", @name="state", @cast_type=#<ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter::MysqlString:0x007fb8a01cada8 @precision=nil, @scale=nil, @limit=255>, @sql_type="varchar(255)", @null=true, @default=nil, @default_function=nil>, "ready"]
+```
+
+We would need to collect bind values this way if we were playing with `WHERE` conditions:
+
+```ruby
+ TranscriptionService.where(state: "ready").arel.to_sql
+ => "SELECT `services`.* FROM `services` WHERE `services`.`type` IN ('TranscriptionService') AND (services.deleted = 0) AND `services`.`state` = ?"
+```
+
+But that's about enough exploring of that for now. I hope to learn more about bind values and how to more robustly use them in these types of query manipulations, but I will close this post about subjoins at that. Right now I'm just psyched that I can join to subclass-specific associations from a parent class. I'll probably only actually use the `as_subclass` version, because really it's not the responsbility of the parent class to know about the subclasses' details, but man this was a fun exercise!

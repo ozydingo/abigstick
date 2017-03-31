@@ -1,0 +1,121 @@
+---
+layout: post
+title: "secure404"
+date: 2016-04-08 22:00:42 -0400
+comments: true
+categories: 
+---
+
+## Intercept the application error debug page under specified conditions
+<a href="#tl-dr-secure404">tl; dr</a>
+
+Our staging server has a security hole. Anyone can access it. Ok, they will get redirected to a login page, just like our production app. So why is that bad? Because our staging server is set up to display debugging information when it encounters an exception.
+
+For sake of argument let's pretend we completely trust everyone with a login to our app, and that our login page is bulletproof. So no one we don't trust can access any page that would display any valuable information, right? They'll just get redirected to our login page, because that's what our controllers do when you're not logged in.
+
+Our staging server still has a security hole.
+
+If you're not logged in, you can request a non-existent route. It responds with a lovely page describing the backtrace of a `ActionDispatch::RoutingError`, along with a table of all of the valid routes in our app. Yikes. Not a disaster, but leaves me feeling a little naked.
+
+Cool, I fire up my editor and try this in `application_controller.rb` to simply redirect non-logged in users when they hit this error:
+
+```ruby application_controller.rb
+  if Rails.env == "staging"
+    rescue_from ActionDispatch:RoutingError, :handle_routing_error
+
+    def handle_routing_error
+      if current_user.nil?
+        redirect_to new_user_sessions_url
+      else
+        super
+      end
+    end
+  end
+```
+
+This would work **great** if it were almost any other type of exception. But it turns out that the `ActionDispatch:RoutingError` is generated outside the controllers (specifically, in `ActionDispatch::DebugExceptions`, which is middleware), so this is no good.
+
+We could setup a catch-all 404 route for any unmatched route. There are even more precise solutions for custom 404 pages by setting the application's `config.exceptions_app` and defining routes for status codes such as 404. However, I only want to handle 404s that are `RoutingError`s for non-logged-in users. Logged in? Do the normal thing. `ActiveRecord::RecordNotFound`? Do the normal thing. Here on staging, the normal thing is to get handled by the `ActionDispatch::DebugExceptions` middleware to show debugging info.
+
+This sounds like a good excuse to learn more about:
+
+###Middleware
+
+Rails's exception pages (public and debug) are handled by middleware, which is why we had no control over them in our controllers. We can do cool things like define a new class that inherits from `ActionDispatch::PublicExceptions`, which is the default `exceptions_app` middleware. We could easily monkey-patch the `call` method, which is the heart of middleware, and basically intercept the `current_user.nil?` condition to do something, else call `super`. Except we're actually not interested in `ActionDispatch::PublicExceptions`, but rather in  `ActionDispatch::DebugExceptions`. _This_ is the class that turns errors into debuggable exception info pages, and this occurs _before_ `ActionDispatch::PublicExceptions` gets a hold of it. In other words, it seems Rails makes it easy to modify behavior for errors pages that get shown publically, but not the private ones that we've set up our staging serer to show using `config.consider_all_requests_local = true`.
+
+Naturally, we could try mucking with `config.consider_all_requests_local = false` in `config/application.rb`, and overriding `show_detailed_exceptions?` or `local_request?`. I haven't figured out `local_request?` yet, but it almost works to use, directly in application_controller.rb:
+
+```ruby
+  def show_detailed_exceptions?
+    current_user.present?
+  end
+```
+
+I say "almost" because while this allows me to still show detailed exceptions only to logged in users, it still won't affect `RoutingErrors`. Again, it's not generated in a controller action (what action would it even use?) And we really do want this debugging information; I have fond memories of `RoutingError`s that occur because a form was built incorrectly and was missing a required parameter. So we've delveoped some cool code, but we're left having not solved our motivating issue, which is how to disable exception debugging for RoutingErrors when user is not logged in.
+
+Well, apparently it's quite easy to write middleware using Rack, and this seems to be the most precise solution to what I'm trying to accomplish. With this apprach, we can intercept a 404 response before it hits `ActionDispatch::DebugExceptions` and decide ourselves what we want to do with it. So here it is:
+
+<a name="tl-dr-secure404"></a>
+
+```ruby staging_exception_handler.rb
+  class StagingExceptionHandler
+
+    def initialize(app)
+      @app = app
+    end
+    
+    def call(env)
+      user_id = env["rack.session"]["user_credentials_id"]
+      code, _, _ = response = @app.call(env)
+      if user_id.blank? && (400..599).include?(code.to_i)
+        return ['401', {'Content-Type' => 'text/html'}, ["(#{code}) Danny's not here, Mrs. Torrance."]]  
+      end
+
+      return response
+    end
+  end
+```
+
+
+Then, to use this, in config/application.rb:
+
+```ruby config/application.rb
+  require "#{Rails.root}/lib/staging_exception_handler.rb"
+  config.middleware.use StagingExceptionHandler
+```
+
+By declaring that we want to `use StagingExceptionHandler`, we're getting Rails to insert this class into our middleware chain (type `rake middleware` to inspect the list). Middleware is called (using the `:call` method) from the outside in; the normal mode of operation is that each middleware instance calls the next (as we are doing with `response = @app.call(env)`) unitl you get to your app. The return value, which is an array of the status code, response header Hash, and response body Array, bubbles up the middleware stack until it gets back to the outer layer and produces a response that your server can deliver.
+
+Here, we're pretty much doing just that: passing the response of the next middleware (stored in `@app`) back as our own return value. However, we have one rule. If the response code is any error or bad request and the user is not logger in, we simply display a rather unhelpful message.
+
+When we have a bad route, the response returned by our app is
+
+`[404, {"X-Cascade"=>"pass"}, ["Not Found"]]`
+
+On the other hand, when we have a valid route with no errors, we get
+
+```ruby
+  [
+    200,
+    {"X-Frame-Options"=>"SAMEORIGIN",
+    "X-XSS-Protection"=>"1; mode=block",
+    "X-Content-Type-Options"=>"nosniff",
+    "Content-Type"=>"text/html; charset=utf-8"},
+    ...skipping response body...
+  ]
+```
+
+So we simply intercept the 404, and well why not any error, for non-logged-in users, and translate that into a response that will simply get rendered in the browser with no more fuss:
+
+`['401', {'Content-Type' => 'text/html'}, ["(#{code}) Danny's not here, Mrs. Torrance."]`
+
+We could of course do more helpful things like redirect to a login page, but it's not immediately clear to me how to access url helpers. In some cases I found I had access to the controller instance via `env["action_controller.instance"]`, but again, routing error, no controller. A similar red-herring with `env["action_dispatch.exception"]` as the exception is not raised until the 404 response hits `ActionDispatch::DebugExceptions`. Another approach would be to hack our way into this communcation line by inserting `env['action_dispatch.show_detailed_exceptions'] = false` then returning. That's probably the most elegant way of handling our problem. But then I don't get to use a quote from The Shining. So for now, I'm leaving this message in.
+
+
+Further Reading:
+
+http://thepugautomatic.com/2014/08/404-with-rails-4/
+https://blog.engineyard.com/2015/understanding-rack-apps-and-middleware
+https://coderwall.com/p/w3ghqq/rails-3-2-error-handling-with-exceptions_app
+http://pothibo.com/2013/11/ruby-on-rails-inside-actiondispatch-and-rack/
+https://medium.com/@paulskarseth/rails-4-rack-middleware-redirect-5f48d4dd76d0#.xrgravw8i
