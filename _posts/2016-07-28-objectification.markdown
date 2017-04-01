@@ -8,7 +8,7 @@ categories:
 
 ## Object Over-Orientation
 
-```ruby hash.rb
+```ruby
 class Hash
   def transcript_sort
     self.sort { |a,b| a.first.to_i <=> b.first.to_i }
@@ -28,7 +28,7 @@ Oh, but it's just one little simple method, what's the harm?
 
 The following is a real-world example from the same code base. No need to parse the method too closely, but you do get bonus points for appreciating how `prepare_interpolation` and `finalize_interpolation` are methods that were inserted into `String` for similarly specific purposes.
 
-```ruby hash.rb
+```ruby
 class Hash
   def split_words(paragraph_starts = [], no_break_up=false, max_word_length=32)
     new_words = {}
@@ -62,7 +62,7 @@ end
 
 The first thing I did to this code when I had a chance was to create a `Transcript` class that contained all the logic related to this transcript object. This class still stores the same data as the `Hash` version, but rather than assimilating `Hash`, it simply uses one as a data member. Ideally, we could have a `sort_words` method here that returned another `Transcript` object with the words sorted (or `sort_words!` for in-place). However, for compatiblilty with more code than I could change in one sitting, I created a `Transcript#sorted_words` method that returned the same array of [timestamp, words], sorted by timestamp.
 
-```ruby transcript.rb
+```ruby
 class Transcript
   def sorted_words
     @words.sort_by{|time, word| time.to_i}

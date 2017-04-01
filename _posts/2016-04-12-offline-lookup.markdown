@@ -22,7 +22,7 @@ My initial motivation was cutting down on db accesses. but with such a small tab
 
 This gem was motivated by creating methods such as `:two_hour_id` and `:standard_id`. I assumed the key field of interest was called "id", but imediately saw the need to customize the name of the lookup column. In this case, it was "name". So the stripped down, basic, original implemnetation looked like this:
 
-```ruby offline_id_lookup.rb
+```ruby
 module OfflineIDLookup
   extend ActiveSupport::Concern
 
@@ -65,7 +65,7 @@ There were a number of modifications I wanted to make. I quickly learned that wh
 
 `TurnaroudnLevel.id_for_name(tuurnaround)` is not hugely more convenient or readable than `TurnaroundLevel.find_by(name: turnaround).try(:id)`, but I still deemed the benefit worth the extra namespace pollution. We already had the lookup data in memory anyway. This became even more true when I moved away from defining these methods in a closure (i.e. a block where I'm referring to variables defined outside the block) because I remain unsure of the overhead of keeping track of large arrays of data define outside a closure. I felt it cleaner and more object=oriented to use a class attribute to store the lookup values on the class itself. So now the root module looks as follows. You'll notice I also started customizing the key field and adding some keyword arg options to the call to what is not simply called `use_offline_lookup`:
 
-```ruby offline_lookup.rb
+```ruby
 module OfflineLookup
   module ActiveRecord
     def use_offline_lookup(field = :name, key: :id, lookup_methods: true)

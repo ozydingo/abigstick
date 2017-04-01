@@ -10,7 +10,7 @@ categories:
 
 For some reason, an easy way to do a `LEFT JOIN` has yet to make into ActiveRecord's lore. There are a lot of ways to build one from scratch. I've decided to let existing ActiveRecord methods do the heavy lifting (so we get handling of nested associations and various association types for free) by doing a regular `joins`. This of course performs an INNER JOIN by default, but with a little understanding of the underlying Arel structure that ActiveRecord uses to represent queries, we can gently pull apart this final result into the its Arel nodes that we can put back together into a left join.
 
-```ruby active_record_extension.rb
+```ruby
 module ActiveRecordExtension
   extend ActiveSupport::Concern
 

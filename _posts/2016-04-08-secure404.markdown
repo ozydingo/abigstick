@@ -19,7 +19,9 @@ If you're not logged in, you can request a non-existent route. It responds with 
 
 Cool, I fire up my editor and try this in `application_controller.rb` to simply redirect non-logged in users when they hit this error:
 
-```ruby application_controller.rb
+In `application_controller.rb`:
+
+```ruby
   if Rails.env == "staging"
     rescue_from ActionDispatch:RoutingError, :handle_routing_error
 
@@ -57,7 +59,7 @@ Well, apparently it's quite easy to write middleware using Rack, and this seems 
 
 <a name="tl-dr-secure404"></a>
 
-```ruby staging_exception_handler.rb
+```ruby
   class StagingExceptionHandler
 
     def initialize(app)
@@ -77,9 +79,9 @@ Well, apparently it's quite easy to write middleware using Rack, and this seems 
 ```
 
 
-Then, to use this, in config/application.rb:
+Then, to use this, in `config/application.rb`:
 
-```ruby config/application.rb
+```ruby
   require "#{Rails.root}/lib/staging_exception_handler.rb"
   config.middleware.use StagingExceptionHandler
 ```

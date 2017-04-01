@@ -16,9 +16,9 @@ We have a `User` class, that has subclasses such as `Admin`, `Contractor`, and `
 
 Well for this basic case, that's really quite easy: `Contractor.all.merge(project.users).joins(:profile)`
 
-In fact, we can easily make this another [secret extension](blog/2016/06/03/secret/):
+In fact, we can easily make this another [secret extension](blog/2016/06/03/secret/) in our file `active_record_extension.rb`:
 
-```ruby active_record_extension.rb
+```ruby
     def as_subclass(subclass)
       subclass.all.merge(self.all)
     end
@@ -46,7 +46,7 @@ Oh, did I mention that `Admin` also has a `:profile` assocaition too that is def
 
 Here's how we accomplish this:
 
-```ruby active_record_extension.rb
+```ruby
     # currently does not work with :through associations
     def subjoins(association)
       associations = descendants.map{|klass| [klass, klass.reflect_on_association(association)]}.to_h.select{|klass, assoc| assoc.present?}

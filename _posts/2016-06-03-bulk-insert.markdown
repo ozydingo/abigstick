@@ -21,7 +21,9 @@ The biggest trick is forming the syntax. I've been getting into more Arel, but t
 
 <a name="tl-dr-bulk_insert"></a>
 
-```ruby active_record_extension.rb
+In `active_record_extension.rb`
+
+```ruby
 def bulk_insert(attribute_array)
   return if attribute_array.empty?
   self.connection.execute(bulk_insert_sql(attribute_array))
