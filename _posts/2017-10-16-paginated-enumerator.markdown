@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "Fun With Enumerators: enumerating over paginated content"
-date: 2017-07-24 00:00:00 -0400
+date: 2017-10-16 00:00:00 -0400
 comments: true
 categories: 
 ---
@@ -9,11 +9,16 @@ categories:
 ---
 ## Summary
 
-Use this code to seamlessly enumerate over paged content (such as an api index route) using a simple `data.each` call. Pages are only fetched when requested.
+Seamlessly enumerate over paged content (such as an api index route) using a simple `.each` call. Pages are only fetched as needed, and all other chainable enumerators also work as expected.
+
+For example:
+```ruby
+data = PaginatedEnumerator.new{|page| JSON.load(`curl api.foo.com?page=#{page}`)}
+data.each{|thing| puts thing}
+```
 
 ---
-
-Skip to [tl;dr](#tl-dr)
+<small>Skip to [tl;dr](#tl-dr)</small>
 
 ## Enumerators and Enumerables
 
@@ -129,7 +134,7 @@ end
 
 Putting this all together, we have a nice, concise, and very useful class!:
 
-<a href="#" name="tl-dr"></a>
+<a name="tl-dr" id="tl-dr"></a>
 
 ```ruby
 class PaginatedEnumerator
@@ -213,7 +218,7 @@ Notice how "FETCHING page n" is not printed until that page is reached; we are a
  => ["0:c", "1:c"]
 ```
 
-But without `lazy`, we would have fetch the entire data set before filtering!!:
+Note that `select` use on a non-lazy enumerator forces evaluation of the entire Array, and this behavior is no different with our enumerator:
 
 ```ruby
 2.3.3 > ee.select{|x| x.last == "c"}.first(2)
