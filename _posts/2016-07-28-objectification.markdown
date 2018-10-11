@@ -3,7 +3,7 @@ layout: post
 title: "objectification"
 date: 2016-07-28 14:26:02 -0400
 comments: true
-categories: 
+tags: [Ruby, OOP]
 ---
 
 ## Object Over-Orientation

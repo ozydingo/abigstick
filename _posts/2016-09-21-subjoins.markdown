@@ -3,7 +3,7 @@ layout: post
 title: "subjoins"
 date: 2016-09-21 22:55:36 -0400
 comments: true
-categories: 
+tags: [Rails]
 ---
 
 ## Join from a parent class to associations defined in subclasses.
@@ -36,8 +36,8 @@ Why, yes. Yes we can. Once again we will make heavy use of [arel](http://jpospis
 
 ```ruby
 User.activate_secret_extensions.subjoins(:profile).to_sql
-# => "SELECT `users`.* FROM `users` 
-#     LEFT OUTER JOIN `admin_profiles` ON `users`.`type` IN ('Admin') AND `admin_profiles`.`user_id` = `users`.`id` 
+# => "SELECT `users`.* FROM `users`
+#     LEFT OUTER JOIN `admin_profiles` ON `users`.`type` IN ('Admin') AND `admin_profiles`.`user_id` = `users`.`id`
 #     LEFT OUTER JOIN `contractor_profiles` ON `users`.`type` IN ('Contractor') AND `contractor_profiles`.`user_id` = `users`.`id`
 #     WHERE (users.deleted = false)"
 ```
@@ -113,7 +113,7 @@ Contractor.joins(:profile).join_sources.last.right.expr.to_sql
  => "`contractor_profiles`.`user_id` = `users`.`id`"
 ```
 
-So that's how we get the join conditions for each assocaition, combining a type condition with the appropriate join condition for that type, and storing this new combination in the variable `conditions`. We then add this to the join stack using 
+So that's how we get the join conditions for each assocaition, combining a type condition with the appropriate join condition for that type, and storing this new combination in the variable `conditions`. We then add this to the join stack using
 
 ```ruby
 arel = arel.join(foreign_klass.arel_table, Arel::Nodes::OuterJoin).on(conditions)
@@ -129,7 +129,7 @@ Ok so what the heck is the outer loop?
 Service.activate_secret_extensions.subjoins(:output_transcript).to_sql
 # => SELECT `services`.* FROM `services`
 #    LEFT OUTER JOIN `transcripts` ON (
-#      `services`.`type` IN ('AlignmentService') AND `transcripts`.`service_id` = `services`.`id` AND `transcripts`.`type` IN ('AlignedTranscript') AND `transcripts`.`archived` = 0 
+#      `services`.`type` IN ('AlignmentService') AND `transcripts`.`service_id` = `services`.`id` AND `transcripts`.`type` IN ('AlignedTranscript') AND `transcripts`.`archived` = 0
 #    OR
 #      `services`.`type` IN ('TranscriptionService') AND `transcripts`.`service_id` = `services`.`id` AND `transcripts`.`type` IN ('TranscribedTranscript') AND `transcripts`.`archived` = 0
 #    )

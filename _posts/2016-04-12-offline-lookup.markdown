@@ -3,7 +3,7 @@ layout: post
 title: "offline_lookup"
 date: 2016-04-12 17:36:36 -0400
 comments: true
-categories: 
+tags: [Rails, Ruby]
 ---
 
 ## Add convenient syntax and reduce db fetches for small lookup tables

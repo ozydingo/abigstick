@@ -3,7 +3,7 @@ layout: post
 title: "fluent rebasing"
 date: 2017-01-09 11:02:11 -0500
 comments: true
-categories: 
+tags: [git]
 ---
 
 Recently, we've adopted [rebasing](https://git-scm.com/book/en/v2/Git-Branching-Rebasing) into our git workflow. Because of this, we now enjoy clean, traceable, and roll-backable code history. Rebasing is great. However, it comes with a few issues, which I will call "rebase trolls". Rebase trolls love to hide out in long-running branches, waiting to make a mockery of your best intentions when you suggest "hey, we should rebase this branch first before merging it into master".

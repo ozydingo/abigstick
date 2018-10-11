@@ -3,7 +3,7 @@ layout: post
 title: "bulk_insert"
 date: 2016-06-03 17:38:15 -0400
 comments: true
-categories: 
+tags: [Rails]
 ---
 
 ## Insert thousands of records in an instant. Even in Rails.

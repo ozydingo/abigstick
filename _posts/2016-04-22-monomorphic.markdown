@@ -3,7 +3,7 @@ layout: post
 title: "monomorphic"
 date: 2016-04-22 17:27:34 -0400
 comments: true
-categories: 
+tags: [Rails]
 ---
 
 ## Join to a a single resource type in a polymorphic assocaition
@@ -47,7 +47,7 @@ end
 
 Provided, of course, the `:bar` assocaiton is set up correclty on class `Foo`. Note that this may be a `has_one` or a `has_many` for your application, and for the latter of course you need to `joins(:bars)` instead of `joins(:bar)`.
 
-Of course we could just use `Bar.first.resource`, but it doesn't feel right to leave this dangling error-prone method out there. 
+Of course we could just use `Bar.first.resource`, but it doesn't feel right to leave this dangling error-prone method out there.
 
 Yay:
 

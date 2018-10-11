@@ -3,7 +3,7 @@ layout: post
 title: "left_join"
 date: 2016-04-09 16:58:25 -0400
 comments: true
-categories: 
+tags: [Rails]
 ---
 
 ## Add a simple left_join method to ActiveRecord

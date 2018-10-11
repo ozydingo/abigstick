@@ -3,7 +3,7 @@ layout: post
 title: "secure404"
 date: 2016-04-08 22:00:42 -0400
 comments: true
-categories: 
+tags: [Rails, Web]
 ---
 
 ## Intercept the application error debug page under specified conditions
@@ -65,7 +65,7 @@ Well, apparently it's quite easy to write middleware using Rack, and this seems 
     def initialize(app)
       @app = app
     end
-    
+
     def call(env)
       user_id = env["rack.session"]["user_credentials_id"]
       code, _, _ = response = @app.call(env)

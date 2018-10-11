@@ -3,7 +3,7 @@ layout: post
 title: "Pitching Rails and ActiveRecord"
 date: 2017-10-05 21:43:00 -0400
 comments: true
-categories:
+tags: [Rails]
 ---
 
 ---

@@ -4,7 +4,7 @@ title: "RenderReturn: a controller Exception"
 subtitle: "Solving the double render problem in Rails"
 date: 2017-11-22 13:15:00 -0400
 comments: true
-categories:
+tags: [Rails]
 ---
 <small>Skip to [tl;dr](#tl-dr)</small>
 

@@ -3,7 +3,7 @@ layout: post
 title: "Fun With Enumerators: enumerating over paginated content"
 date: 2017-10-16 00:00:00 -0400
 comments: true
-categories: 
+tags: [Ruby]
 ---
 
 ---

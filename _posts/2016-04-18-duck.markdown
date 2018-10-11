@@ -3,7 +3,7 @@ layout: post
 title: "duck, duck, goose"
 date: 2016-04-18 21:55:27 -0400
 comments: true
-categories: 
+tags: [Ruby]
 ---
 
 Duck typing and I are in a fight.
@@ -17,7 +17,7 @@ But I always prefer `is_a?` over `responds_to?`. Using `responds_to?`, you never
 
 A counter-argument, according to [Wikipedia](https://en.wikipedia.org/wiki/Duck_typing), is that
 
-> the issue is handled by testing, and the necessary knowledge of the codebase required to maintain it 
+> the issue is handled by testing, and the necessary knowledge of the codebase required to maintain it
 
 Bollocks.
 

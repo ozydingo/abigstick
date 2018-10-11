@@ -3,7 +3,7 @@ layout: post
 title: "Rails is Ridiculous"
 date: 2017-03-30 17:32:39 -0400
 comments: true
-categories: 
+tags: [Rails, Ruby]
 ---
 
 ## Part 1 of many to come
