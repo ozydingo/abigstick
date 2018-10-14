@@ -70,12 +70,15 @@ When you view your code base as a bag of files instead of a series of commits, a
 
 Why? Because rebasing, AKA manipulating commits, is difficult when the commits themselves don't actually represent any coherent set of changes. Not just because you don't know which change is where, but because commits littered with fixes to other commits introduces dependencies to those commits, and reordering or cherry picking commits becomes difficult or impossible. So commit wisely, and avoid the rebase trolls!
 
-`git add $file1 $file2 ...` - add only specified files to the changes staged for commit. You likely already know this one, but may largely use the `git add .` form ("add everything"). Be more specific! Need to make a quick unrelated fix in the middle of your feature branch? `git add $that_file; git commit -m 'fix that_file'`.
+`git add $file1 $file2 ...` - add only specified files to the changes staged for commit. You likely already know this one, but may largely use the `git add .` form ("add everything"). Be more specific!
 
-Did you make a quick fix on a file that you have other changes on for your branch?
+Need to make a quick unrelated fix in the middle of your feature branch? `git add $that_file; git commit -m 'fix that_file'`.
+
+What if that quick fix was in the same file you were working on for another feature? Don't worry, git has you covered:
 
 <a name="add" id="add"></a>
 `git add -p` (or `--patch`) - select specific sections of code changes to stage for commit.
+<br>
 `git add -i` (or `--interactive`, from which you can enter `patch` mode)
 
 Using the patch tool, you are provocatively asked for each section of code that has changed if you want to "stage this hunk?". Here, you can answer "yes" only to the hunks that are the typo fix, commit those changes (using `--fixup` if you so choose), then continue coding as if nothing had interrupted your flow. You can also use the `s` command to split a hunk into smaller sections if the quick fix you're looking to add is only a piece of the current hunk. Hunk hunk hunk. Great word.
@@ -85,7 +88,10 @@ Using the patch tool, you are provocatively asked for each section of code that 
 Visibility is key to avoiding traps, so knowing how to easily detect lurking rebase trolls can help you vanquish them. For this, you'll first want to make liberal use of `git log`. Here are a few forms of `git log` that can be helpful when preparing for battle.
 
 <a name="log" id="log"></a>`git log --graph` - show a graphical represnetation of existing commits and their parent commits.
-`git log master..head` - show commits that exist on `head` but not on `master`. What happens if you switch `head` and `master`?
+
+
+`git log master..head` - show only the commits that you've made on `head` that are not yet on `master`. Switch `master` and `head` around and you see only the commits that `master` has that you don't (i.e. other feature merged into master).
+
 `git show $sha` - show the changes made by `$sha`.
 
 <a name="cherry" id="cherry"></a>
@@ -93,8 +99,10 @@ Visibility is key to avoiding traps, so knowing how to easily detect lurking reb
 
 <a name="name-status" id="name-status"></a>
 `git diff --name-status` - view just the file names that have been modified or added, each with a "M" or "A" to indicate which. Using the default refs essentially gives you the same as `git status`, but with `diff` you can view this form between any two git refs.
+
 `git show $sha --name-status` - the same for a single commit using `git show`
-`git log --name-status` - the same for `git log`
+
+`git log --name-status` - the same as above for `git log`
 
 # Battle
 
@@ -116,10 +124,13 @@ When you are resolving a merge conflict, git's default two-sided (`<<<<<<` vs `>
 <a name="conflict" id="conflict"></a>
 `git checkout --conflict=diff3 $file_with_merge_conflict` - checkout the conflicted file with an additional merge conflict marker (`|||||||`) that shows you what the original form of the code was before either branch modified it. I like this view enough to make it my default.
 
+[image1: diff3]
+
 `git config --global merge.conflictstyle diff3` - make the above your default.
 
 <a name="ours-theirs" id="ours-theirs"></a>
 `git checkout --ours $file` - blow away the other branch's file in favor of yours.
+
 `git checkout --theirs $file` - blow away your own file in favor of the other branch's.
 
 ## 3. Build a new branch
