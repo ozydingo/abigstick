@@ -6,6 +6,14 @@ This blog is built by Jekyll and hosted as a static site in a Google Cloud bucke
 
 ## How to build
 
+Install [jeckyll](https://jekyllrb.com/):  
+`gem install bundler jekyll`
+
+_Note_: on OS default installs of Ruby in early 2019, there is an SSL issue that prevents `gem` from working. Installing a new ruby may be all you need to fix this:
+* Follow the instructions at [rvm.io](https://rvm.io/) to install rvm
+* Install the latest ruby `rvm install ruby-head`
+* Confirm `rvm list` shows that you are using the latest ruby, or `ruby --version` does the same.
+
 ### Start the server (for local testing)
 `bundle exec jekyll serve`
 
@@ -13,14 +21,7 @@ This blog is built by Jekyll and hosted as a static site in a Google Cloud bucke
 `jekyll build`
 
 ### Sync with google storage bucket
-`gsutil rsync -R _site/ gs://www.bigstickcoding.com`
-TODO: why is this copying everything and not just what was updated?
-
-May be related to warning message:
-> NOTE: You are performing a sequence of gsutil operations that may
-run significantly faster if you instead use gsutil -m -o ... Please
-see the -m section under "gsutil help options" for further information
-about when gsutil -m can be advantageous.
+`gsutil -m rsync -edru _site/ gs://www.bigstickcoding.com`
 
 ### Install gsutil
 ```
