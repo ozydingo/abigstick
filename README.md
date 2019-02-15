@@ -1,7 +1,15 @@
-### Start the server
+# Big Stick Coding
+
+This is a blog about coding things I've encountered. Its scope includes small code modules I made & like to philosophical musings and rants about development.
+
+This blog is built by Jekyll and hosted as a static site in a Google Cloud bucket (www.bigstickcoding.com), pointed to by Google Domains & DNS (www.bigstickcoding.com).
+
+## How to build
+
+### Start the server (for local testing)
 `bundle exec jekyll serve`
 
-### Build the \_site directory
+### Build (into the the \_site directory)
 `jekyll build`
 
 ### Sync with google storage bucket
