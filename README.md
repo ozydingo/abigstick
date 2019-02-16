@@ -17,6 +17,9 @@ _Note_: on OS default installs of Ruby in early 2019, there is an SSL issue that
 ### Start the server (for local testing)
 `bundle exec jekyll serve`
 
+### Build with production features (e.g. Disque)
+`JEKYLL_ENV=production jekyll build`
+
 ### Build (into the the \_site directory)
 `jekyll build`
 
