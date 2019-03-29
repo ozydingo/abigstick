@@ -3,7 +3,7 @@ layout: post
 title: "Exclusionary Elitism in Machine Learning"
 date: 2019-02-16 00:00:00 -0400
 comments: true
-tags: [Machine Learning]
+tags: [Machine Learning, Rants]
 ---
 
 I'm branching out. I'm shifting focus onto the pursuits of passion for machine perception, a subset of machine learning. While I'm far from expert, I've developed a pretty good ground-up understanding of the origins, components, and applicability of the recent well-deserved and over-hyped craze of deep learning.
