@@ -8,6 +8,14 @@ pre.highlight {
   box-shadow: 1px 2px 6px #777;
 }
 
+.post-meta-item {
+  display: inline;
+}
+
+.post-date {
+  margin-right: 10px;
+}
+
 .tag-list {
   padding-bottom: 5px;
 }
@@ -15,6 +23,7 @@ pre.highlight {
 .post-tag {
   font-size: 0.85em;
   background-color: #cce;
+  color: #000;
   border-radius: 0.3em;
   display: inline;
   padding: 2px 4px 2px 4px;
