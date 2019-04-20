@@ -17,13 +17,16 @@
 .home {
   width: 100%;
   background-color: rgba(255,255,255,0.87);
-  box-shadow: 0px 0px 15px 8px rgba(255,255,255,0.4);
+  box-shadow: 0px 0px 8px 2px rgba(255,255,255,0.4);
   padding: 15px;
 }
 
 .post-title-in-list {
   font-size: 2em;
-  color: black;
+
+  a {
+    color: #311;
+  }
 }
 
 .post-description-in-list {
@@ -38,7 +41,7 @@
 .post {
   width: 100%;
   background-color: rgba(255,255,255,0.87);
-  box-shadow: 0px 0px 15px 8px rgba(255,255,255,0.4);
+  box-shadow: 0px 0px 8px 2px rgba(255,255,255,0.4);
   padding: 15px;
 }
 
@@ -47,12 +50,9 @@ pre.highlight {
   box-shadow: 1px 2px 6px #777;
 }
 
-.post-meta-item {
-  display: inline;
-}
-
 .post-date {
   margin-right: 10px;
+  color: #555;
 }
 
 .tag-list {
