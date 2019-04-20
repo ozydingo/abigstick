@@ -55,6 +55,15 @@ pre.highlight {
   box-shadow: 1px 2px 6px #777;
 }
 
+code {
+  border-radius: 0.25em;
+  box-shadow: 0.5px 1px 2px #777a;
+}
+
+pre code {
+  box-shadow: none;
+}
+
 .post-date {
   margin-right: 10px;
   color: #555;
