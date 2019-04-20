@@ -18,11 +18,19 @@
   min-width: 80%;
 }
 
-.home {
+.whitebox {
   width: 100%;
   background-color: rgba(255,255,255,0.87);
   box-shadow: 0px 0px 8px 2px rgba(255,255,255,0.6);
   padding: 15px;
+  transition-property: background-color;
+  transition-duration: 0.4s;
+
+  &:hover {
+    background-color: rgba(255,255,255,0.9);
+    transition-property: background-color;
+    transition-duration: 0.4s;
+  }
 }
 
 .post-title-in-list {
@@ -40,13 +48,6 @@
 
 .post-list-spacer {
   padding-bottom: 16px;
-}
-
-.post {
-  width: 100%;
-  background-color: rgba(255,255,255,0.87);
-  box-shadow: 0px 0px 5px 2px rgba(255,255,255,0.6);
-  padding: 15px;
 }
 
 pre.highlight {
