@@ -21,13 +21,6 @@ layout: default
           <div class="post-meta-item post-date">
             {{ post.date | date: date_format }}
           </div>
-          <div class="tag-list post-meta-item">
-            {% for tag in post.tags %}
-              <div class="post-tag">
-                {{ tag }}
-              </div>
-            {% endfor %}
-          </div>
         </span>
         <div class="post-title-in-list">
           <a class="post-link" href="{{ post.url | relative_url }}">
@@ -42,6 +35,14 @@ layout: default
         {%- if site.show_excerpts -%}
           {{ post.excerpt }}
         {%- endif -%}
+        <div class="tag-list post-meta-item">
+          {% for tag in post.tags %}
+            <div class="post-tag">
+              {{ tag }}
+            </div>
+          {% endfor %}
+        </div>
+        <div class="post-list-spacer"></div>
       </li>
       {%- endfor -%}
     </ul>
