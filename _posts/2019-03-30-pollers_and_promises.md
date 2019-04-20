@@ -1,6 +1,7 @@
 ---
 layout: post
 title: "Pollers and Promises"
+description: "Waiting for an external signal using Promises"
 date: 2019-03-29 00:00:00 -0400
 comments: true
 tags: [Javascript, Async, Promise]

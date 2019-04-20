@@ -1,9 +1,10 @@
 ---
 layout: post
 title: "secure404"
+description: "Using middleware to tighten staging environment security"
 date: 2016-04-08 22:00:42 -0400
 comments: true
-tags: [Rails, Web]
+tags: [Rails, Middelware]
 ---
 
 ## Intercept the application error debug page under specified conditions

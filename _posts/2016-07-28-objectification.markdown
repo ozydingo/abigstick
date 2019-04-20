@@ -1,6 +1,7 @@
 ---
 layout: post
 title: "objectification"
+description: "How Ruby encourages bad OOP design"
 date: 2016-07-28 14:26:02 -0400
 comments: true
 tags: [Ruby, OOP]

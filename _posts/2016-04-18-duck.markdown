@@ -1,9 +1,10 @@
 ---
 layout: post
 title: "duck, duck, goose"
+description: "If it quacks, does it really quack like a duck?"
 date: 2016-04-18 21:55:27 -0400
 comments: true
-tags: [Ruby]
+tags: [Ruby, OOP]
 ---
 
 Duck typing and I are in a fight.

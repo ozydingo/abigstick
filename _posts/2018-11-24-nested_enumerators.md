@@ -1,9 +1,10 @@
 ---
 layout: post
-title: "More Fun With Enumerators: Nesting enumeration in a pixel marquee"
+title: "More Fun With Enumerators: Nesting"
+description: "Enumerating over a custom sub-structure of a list"
 date: 2018-11-24 00:00:00 -0400
 comments: true
-tags: [Ruby]
+tags: [Ruby, Enumerator]
 ---
 
 <small>Skip to the [detail](#detail)</small>

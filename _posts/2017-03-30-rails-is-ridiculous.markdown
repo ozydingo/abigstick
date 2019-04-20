@@ -1,6 +1,7 @@
 ---
 layout: post
 title: "Rails is Ridiculous"
+description: "A rant about some decisions in Rails"
 date: 2017-03-30 17:32:39 -0400
 comments: true
 tags: [Rails, Ruby]

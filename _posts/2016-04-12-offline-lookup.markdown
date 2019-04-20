@@ -1,6 +1,7 @@
 ---
 layout: post
 title: "offline_lookup"
+description: "An easy gem to avoid db queries for lookup tables"
 date: 2016-04-12 17:36:36 -0400
 comments: true
 tags: [Rails, Ruby]

@@ -1,6 +1,7 @@
 ---
 layout: post
 title: "Abstract Interfaces in Ruby"
+description: "Declare a method interface for Ruby classes"
 date: 2018-10-11 21:30:00 -0400
 comments: true
 tags: [Ruby, Java, OOP]

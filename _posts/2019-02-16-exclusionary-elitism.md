@@ -1,6 +1,7 @@
 ---
 layout: post
 title: "Exclusionary Elitism in Machine Learning"
+description: "A rant about attitudes in other fields"
 date: 2019-02-16 00:00:00 -0400
 comments: true
 tags: [Machine Learning, Rants]

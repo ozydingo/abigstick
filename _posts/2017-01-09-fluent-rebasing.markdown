@@ -1,6 +1,7 @@
 ---
 layout: post
 title: "fluent rebasing"
+description: "Git techniques to deal with rebase hell"
 date: 2017-01-09 11:02:11 -0500
 comments: true
 tags: [git]

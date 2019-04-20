@@ -2,9 +2,10 @@
 layout: post
 title: "RenderReturn: a controller Exception"
 subtitle: "Solving the double render problem in Rails"
+description: "Easily end a controller action without risking the double render error"
 date: 2017-11-22 13:15:00 -0400
 comments: true
-tags: [Rails]
+tags: [Rails, ActiveController]
 ---
 <small>Skip to [tl;dr](#tl-dr)</small>
 

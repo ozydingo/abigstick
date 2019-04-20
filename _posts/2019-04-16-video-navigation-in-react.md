@@ -2,6 +2,7 @@
 layout: post
 title: "Video Navigation in React"
 subtitle: "Representing a transient, imperative command in a declarative framework"
+description: "Seeking to a time in a video of a sibling component"
 date: 2019-04-16 03:45:00 -0400
 comments: true
 tags: [React, Javascript, Video]

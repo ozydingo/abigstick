@@ -1,9 +1,10 @@
 ---
 layout: post
 title: "monomorphic"
+description: "Fully featured joining to subtypes of polymorphic associations"
 date: 2016-04-22 17:27:34 -0400
 comments: true
-tags: [Rails]
+tags: [Rails, ActiveRecord, Polymorphism]
 ---
 
 ## Join to a a single resource type in a polymorphic assocaition

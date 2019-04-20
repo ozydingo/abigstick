@@ -1,9 +1,10 @@
 ---
 layout: post
 title: "bulk_insert"
+description: "MySQL-dependent efficient bulk create for ActiveRecord models"
 date: 2016-06-03 17:38:15 -0400
 comments: true
-tags: [Rails]
+tags: [Rails, ActiveRecord, SQL]
 ---
 
 ## Insert thousands of records in an instant. Even in Rails.

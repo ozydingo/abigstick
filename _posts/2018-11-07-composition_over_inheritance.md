@@ -1,6 +1,7 @@
 ---
 layout: post
 title: "Composition over Inheritance"
+description: "A re-exploration of what this phrase actually means"
 date: 2018-11-23 07:30:00 -0400
 comments: true
 tags: [Ruby, OOP]

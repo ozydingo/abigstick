@@ -1,9 +1,10 @@
 ---
 layout: post
-title: "Fun With Enumerators: enumerating over paginated content"
+title: "Fun With Enumerators: pagination"
+description: "Create an enumerator that seamlessly iterates over individual items fetched in pages"
 date: 2017-10-16 00:00:00 -0400
 comments: true
-tags: [Ruby]
+tags: [Ruby, Enumerator, Pagination]
 ---
 
 ---

@@ -1,9 +1,10 @@
 ---
 layout: post
 title: "subjoins"
+description: "Using Arel to join to a subtype of an STI model"
 date: 2016-09-21 22:55:36 -0400
 comments: true
-tags: [Rails]
+tags: [Rails, Arel, Single Table Inheritance]
 ---
 
 ## Join from a parent class to associations defined in subclasses.

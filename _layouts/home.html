@@ -29,11 +29,16 @@ layout: default
             {% endfor %}
           </div>
         </span>
-        <h3>
+        <div class="post-title-in-list">
           <a class="post-link" href="{{ post.url | relative_url }}">
             {{ post.title | escape }}
           </a>
-        </h3>
+        </div>
+        {%- if post.description -%}
+          <div class="post-description-in-list">
+            {{post.description | escape}}
+          </div>
+        {%- endif -%}
         {%- if site.show_excerpts -%}
           {{ post.excerpt }}
         {%- endif -%}

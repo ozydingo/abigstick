@@ -1,6 +1,7 @@
 ---
 layout: post
 title: "Pitching Rails and ActiveRecord"
+description: "Making the case for Rails to a non-Rails developer"
 date: 2017-10-05 21:43:00 -0400
 comments: true
 tags: [Rails]
