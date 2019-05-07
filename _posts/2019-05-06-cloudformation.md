@@ -307,6 +307,7 @@ The architecture:
 
 This one's actually pretty simple as far as CloudFormation goes. In fact, you can see that our physical resource list hasn't changed. All we needed to do was add the `AmazonRekognitionFullAccess` policy to the Lambda function's execution role (under `Policies`), and use the [AWS Rekognition SDK](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/Rekognition.html) to call [DetectFaces](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/Rekognition.html#detectFaces-property). This call returns the result in the same request, so there isn't really any additional architecture needed. We just get the result of `DetectFaces` and put it, instead of the file name, onto the Kinesis data stream.
 
+<a id="template_v5"></a>
 ### Let's get movin'
 
 V4 was a cop-out; we didn't change any architecture! Let's build in some more advanced Rekogntiion calls that will have us building an SNS topic and a second Lambda function. Specifically, we're going to use the [PersonTracking](https://docs.aws.amazon.com/cli/latest/reference/rekognition/start-person-tracking.html) Rekognition operation, an asynchronous task that we will have to handle in a separate piece of our stack.
