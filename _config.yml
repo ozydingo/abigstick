@@ -22,7 +22,7 @@ url: "http://www.abigstick.com" # the base hostname & protocol for your site, e.
 twitter_username: ozydingo
 github_username:  ozydingo
 disqus:
-  shortname: big-stick-coding
+  shortname: a-big-stick
 # Build settings
 markdown: kramdown
 theme: minima
