@@ -24,7 +24,7 @@ _Note_: on OS default installs of Ruby in early 2019, there is an SSL issue that
 `jekyll build`
 
 ### Sync with google storage bucket
-`gsutil -m rsync -edru _site/ gs://www.bigstickcoding.com`
+`gsutil -m rsync -edru _site/ gs://www.abigstick.com`
 
 ### Install gsutil
 ```
