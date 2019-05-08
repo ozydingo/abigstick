@@ -315,7 +315,7 @@ V4 was a cop-out; we didn't change any architecture! Let's build in some more ad
 <div>
   <span class="skip-link"><a href="#template_v4">Go to v4 &laquo;</a></span>
   <span class="filename">template_v5.yaml</span>
-  <!-- <span class="skip-link"><a href="#template_v6"> &raquo; Go to v6</a></span> -->
+  <span class="skip-link"><a href="#template_v6"> &raquo; Go to v6</a></span>
 </div>
 
 <pre class="highlight"><code><span class="unmodified">Transform: 'AWS::Serverless-2016-10-31'
@@ -472,6 +472,175 @@ The idea here is that granting another entity an IAM role is a large potential s
 
 Phew!
 
+<a id="template_v6"></a>
+### Impressive package
+
+In our next iteration, we're not going to change our stack architecture at all. Instead, we're going to extract our lambda functions' inline code into separate files. Doing this requires that we change our deploy procedure and, you guessed it, build more infrastructure.
+
+<div>
+  <span class="skip-link"><a href="#template_v5">Go to v5 &laquo;</a></span>
+  <span class="filename">template_v6.yaml</span>
+  <!-- <span class="skip-link"><a href="#template_v6"> &raquo; Go to v6</a></span> -->
+</div>
+
+<pre class="highlight"><code><span class="unmodified">Transform: 'AWS::Serverless-2016-10-31'
+Transform: 'AWS::Serverless-2016-10-31'
+
+Globals:
+  Function:
+    Environment:
+      Variables:
+        OUTPUT_STREAM: !Ref OutputStream
+        SNS_PERSON_TRACKING_ROLE: !Ref PersonTrackingSnsRole
+        SNS_PERSON_TRACKING_ROLE_ARN: !GetAtt PersonTrackingSnsRole.Arn
+        SNS_PERSON_TRACKING: !Ref PersonTrackingSnsChannel
+
+
+Resources:
+  UploadBucket:
+    Type: AWS::S3::Bucket
+    Description: Input bucket for uploaded files
+  UploadHandler:
+    Type: AWS::Serverless::Function
+    Description: Responds to uploaded files
+    Properties:
+      Handler: index.handler
+      Runtime: nodejs8.10</span>
+      CodeUri: ./v6_src/UploadHandler
+      <span class="unmodified">Policies:
+        - AWSLambdaExecute
+        - AmazonRekognitionFullAccess
+        - Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action: iam:PassRole
+              Resource: !GetAtt PersonTrackingSnsRole.Arn
+      Events:
+        NewFile:
+          Type: S3
+          Properties:
+            Bucket: !Ref UploadBucket
+            Events: s3:ObjectCreated:*
+  PersonTrackingSnsChannel:
+    Type: AWS::SNS::Topic
+    Description: SNS Topic to notify of completed Rekognition/PersonTracking jobs
+  PersonTrackingSnsRole:
+    Type: AWS::IAM::Role
+    Description: Provides permission to publish job completion notifications to SNS
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: rekognition.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+  PersonTrackingJobHandler:
+    Type: AWS::Serverless::Function
+    Description: Handle completed Rekognition/PersonTracking jobs
+    Properties:
+      Handler: index.handler
+      Runtime: nodejs8.10</span>
+      CodeUri: ./v6_src/PersonTrackingJobHandler
+      <span class="unmodified">Policies:
+        - AWSLambdaExecute
+        - AmazonKinesisFullAccess
+      Events:
+        PersonTrackingJobComplete:
+          Type: SNS
+          Properties:
+            Topic: !Ref PersonTrackingSnsChannel
+  OutputStream:
+    Type: AWS::Kinesis::Stream
+    Description: "Collects all output data"
+    Properties:
+      ShardCount: 1
+      StreamEncryption:
+        EncryptionType: KMS
+        KeyId: alias/aws/kinesis
+
+Outputs:
+  UploadBucketName:
+    Description: Name of the upload bucket
+    Value: !Ref UploadBucket</span>
+</code></pre>
+
+<span class="filename">v6_src/UploadeHandler/index.js</span>
+```js
+const util = require('util');
+const aws = require('aws-sdk');
+const rekog = new aws.Rekognition();
+const startPersonTracking = util.promisify(rekog.startPersonTracking.bind(rekog));
+
+exports.handler = async (event) => {
+  const bucket = event.Records[0].s3.bucket.name;
+  const key = event.Records[0].s3.object.key;
+  const resp = await startPersonTracking({
+    Video: {
+      S3Object: {
+        Bucket: bucket,
+        Name: key,
+      }
+    },
+    JobTag: key,
+    NotificationChannel: {
+      RoleArn: process.env.SNS_PERSON_TRACKING_ROLE_ARN,
+      SNSTopicArn: process.env.SNS_PERSON_TRACKING
+    }
+  });
+  console.log("Response from rekognition:");
+  console.log(resp);
+};
+```
+
+<span class="filename">v6_src/PersonTrackingJobHandler/index.js</span>
+```js
+const util = require('util');
+const aws = require('aws-sdk');
+const kinesis = new aws.Kinesis();
+const putRecords = util.promisify(kinesis.putRecords.bind(kinesis));
+
+exports.handler = async (event) => {
+  console.log("Looks like we done tracked a person");
+  console.log(event.Records[0].Sns);
+  await putRecords({
+    Records: [{
+      Data: JSON.stringify(event.Records[0].Sns),
+      PartitionKey: 'shard-0',
+    }],
+    StreamName: process.env.OUTPUT_STREAM,
+  });
+};
+```
+
+Nothing has changed about out stack, we're just organizing our Lambda function code into their own subfolders. This will make it easier to do lovely things like write tests, which you'll notice are suspiciously lacking from our development here.
+
+We can't deploy this CloudFormation template as is. Because the template points to local files for the Lambda function code, we need to "package" it, which we can do using the `aws cloudformation package` command. To do this, we need an S3 bucket where the packaged files will go. So let's create one, which we will name sort of like `hello-stack-src` -- except bucket names must be unique across all AWS accounts ever, so we'll append out account id to make it probably unique:
+
+```
+ACCOUNT_ID=$(aws sts get-caller-identity --output text --query 'Account')
+SRC_BUCKET="hello-stack-src-$ACCOUNT_ID"
+aws s3 mb s3://$SRC_BUCKET
+```
+
+Now we package the objects needed by our template
+
+```
+aws cloudformation package --s3-bucket $SRC_BUCKET --output-template-file packaged_template.yaml --template-file template_v6.yaml
+```
+
+And deploy the packaged template as before
+
+```
+aws cloudformation deploy --stack-name hello-stack --capabilities CAPABILITY_IAM --template-file packaged_template.yaml
+```
+
+Here's the updated architecture digram that includes the resources used by our deploy process.
+
+![Architecture diagram of the template_v6 architecture]({{site.url}}/assets/images/posts/{{page.id | slugify}}/template_v6-architecture.png "template_v6 architecture")
+
 ## In sum
 
 * We built a functional, scalable machine vision pipeline (using off the shelf machine vision, of course) one step at a time in order to gain an appreciation an understanding of the CloudFormation constructs required to build the final product.
@@ -482,4 +651,6 @@ Phew!
 
 * For most communications between these components, we needed to declare or have given for us some IAM role. Most of the time, for these roles, we were able to use "managed policies", but sometimes we needed to specify the policy documents manually. In some cases, when we needed to grant permission to a service to invoke a lambda function, we didn't create an IAM role but instead defined a concept that AWS doesn't seem to have a consistent name for, sometimes a "Function Policy", sometimes a "Lambda Permission", elsewhere a "Trust Policy".
 
-Moving forward, I'd definitely encourage to beef up the Lambda code, for example by adding error handling, file type validation, and such. I may soon come back and add additional template layers that work with separate files instead of inline code, perhaps add on a few more AWS services / resources, and even create a Lambda function that can spin up this template on the fly -- but I've had quite enough for now, so bye!
+Nex steps? I'd definitely encourage to beef up the Lambda code, for example by adding error handling, file type validation, and such. There are plenty more AWS services to play with spinning up via CloudFormation. It'd also be cool to set up this deploy process o trigger on-demand via a separate Lambda function or web server -- imagine allowing users to log in and in doing so launch this or even a customized stack specific to their user session!
+
+But I've had quite enough for now, so bye!
