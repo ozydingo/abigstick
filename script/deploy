@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+set -e
+EKYLL_ENV=production jekyll build
+gsutil -m rsync -edru _site/ gs://www.abigstick.com
