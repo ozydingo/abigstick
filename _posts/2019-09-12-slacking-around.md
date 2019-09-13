@@ -19,11 +19,9 @@ Throughout this post, we'll be using [Google Cloud Functions](https://cloud.goog
 
 ## Create a Slack app
 
-The first thing you need to do is create a slack app. Head over to https://api.slack.com/apps and click "Create New App". You'll need to do this in both workspaces; let's start with the "origin" workspace that we're going to lose access to.
+The first thing you need to do is create a slack app. Head over to https://api.slack.com/apps and click "Create New App". You'll need to do this in both workspaces; let's start with the "target" workspace that we're going to lose access to.
 
 {% include post_image.html name="create-app.png" width="500px" alt="Create New App dialog" title="Create New App dialog"%}
-
-(Note that I'm using one of two personal workspaces here to protect the company's workspace identity.)
 
 ## Incoming Webhooks
 
@@ -49,11 +47,11 @@ You'll also notice that Slack announces to the incoming channel that you've adde
 
 ## Talking with Ghosts
 
-Now that we have an incoming webhook, we need a way to trigger it. Head over to your other workspace and create an app for that workspace too. We're going to first add the ability to post messages to the other workspace via the webhook we already created. To do that, we'll use Slack's "Slash Commands" feature.
+Now that we have an incoming webhook, we need a way to trigger it. We'll create a Slack app in our "hidden" workspace to do so using the webhook we just created and Slack's "Slash Commands" feature.
 
 {% include post_image.html name="slash-commands.png" width="500px" alt="Slash command feature" title="Slash commands"%}
 
-We'll create a slash command, `/haunt` that allows us to send messages to the webhook typing, for example `/haunt Hello from the other side!`. As we set this up, you'll notice we need a POST URL to send the slash command data to.
+We'll create a slash command, `/haunt` that allows us to send messages to the target workspace typing, for example `/haunt Hello from the other side!`. As we set this up, you'll notice we need a POST URL to send the slash command data to.
 
 {% include post_image.html name="create-slash-command.png" width="500px" alt="Create slash command dialog" title="Create slash command"%}
 
@@ -64,14 +62,8 @@ For this we're going to use Google Cloud Functions. Mostly using default setting
 I'm going to use Node.js 8 as the runtime. We'll start out with the following code to look at what Slack sends us.
 
 ```js
-/**
- * Responds to any HTTP request.
- *
- * @param {!express:Request} req HTTP request context.
- * @param {!express:Response} res HTTP response context.
- */
 exports.haunt = (req, res) => {
-  body = req.body;
+  const body = req.body;
   console.log(body)
   res.status(200).send("ok");
 };
@@ -94,7 +86,7 @@ Type in a message and in a short while you'll get the "ok" response that our Clo
 Head back to the cloud function and click "View Logs". You should see exactly one function execution. If you triggered it multiple times find the appropriate log entry. You'll see that our `console.log` statement told us what we're working with:
 
 ```
-textPayload: "{ token: '[---REDACTED---]',
+{ token: '[---REDACTED---]',
   team_id: '[---REDACTED---]',
   team_domain: '[---REDACTED---]',
   channel_id: '[---REDACTED---]',
@@ -104,7 +96,7 @@ textPayload: "{ token: '[---REDACTED---]',
   command: '/haunt',
   text: 'Oooooooo!!!',
   response_url: 'https://hooks.slack.com/commands/[---REDACTED---]',
-  trigger_id: '760926744263.431810811761.0e7bf2c9fd50d6caa2f5a0e58d620674' }"
+  trigger_id: '760926744263.431810811761.0e7bf2c9fd50d6caa2f5a0e58d620674' }
 ```
 
 Pardon the redactions, but I don't want to make your job spamming my slack any easier. In any case, we have the pieces we need: the user id/name, the text that was sent, and, from before, the incoming web hook URL. Now we just need a way to have our cloud function send a POST request to our incoming webhook and we've completed the first part of functionality.
@@ -129,7 +121,7 @@ const axios = require('axios');
 const webhookUrl = 'YOUR WEBHOOK URL';
 
 exports.haunt = (req, res) => {
-  body = req.body;
+  const body = req.body;
   console.log(body);
   const text = body.text;
   const data = { text };
@@ -161,4 +153,138 @@ And the confirmation message
 
 ## Listen up
 
-So far we've just created a way to send messages. We also need to be able to receive them!
+So far we've just created a way to send messages. We also need to be able to receive them! To do this, first let's go ahead and set up another Cloud Function that will handle these messages. I'll create a function called 'abigstick-watch' with the following code.
+
+```js
+exports.watch = (req, res) => {
+  res.status(200).send(req.body.challenge);
+};
+```
+
+Bear with me; once we put this URL into our Slack app it will immediately attempt to verify it by sending it a `challenge` parameter and it will verify the URL if it receives the same challenge back.
+
+Once this function is created, we'll go back into our "Ghost" app settings (that's the on in the target workspace), click into "Event Subscriptions", and turn this feature on. Paste in the http trigger from the function created above, and you should see the URL verification method, confirming that our function sent back the challenge. If it fails, you can always hit "retry" after fixing the errors.
+
+Now add subscriptions to the following events:
+
+* message.im (for direct messages)
+* message.groups (for private channel messages)
+* message.channels (for public channel messages)
+* message.npim (for multi-party direct messages)
+
+Save changes.
+
+Don't get freaked out (or excited about) the "private channel" thing -- your used authorizes the app and it only has access to the authorizing user(s) private channels.
+
+As stated on that page, you also need to add the associate OAuth scopes:
+
+* im:history
+* groups:history
+* channels:history
+* npim:history
+
+Click into "OAuth & Permissions", scroll down to "Scopes" and add these four scopes. You'll notice that the "incoming-webhook" scope has already been added by our actions above.
+
+Hit "Save Changes", and you'll see a big warning banner across page telling you you need to reinstall your app. This will happen any time you changes your app's scopes, and it will post a message about this change to a channel of your choosing. If you choose a channel different from the webhook we set up above, it will also add a webhook to that channel. You can keep that additional webhook or delete it.
+
+Now that the event subscriptions are in place, we'll change the code of our function to do something useful with them. Again, first, let's just log it to see what it looks like. Change the function's source code to
+
+```js
+exports.watch = (req, res) => {
+  body = req.body;
+  console.log(body)
+  res.status(200).send("ok");
+};
+```
+
+Once deployed, go back into Slack, in the target workspace, and type in a message (easiest place to test is in your self-channel).
+
+View the result in the function's log:
+
+```
+{ token: '[---REDACTED---]',
+ team_id: '[---REDACTED---]',
+ api_app_id: '[---REDACTED---]',
+ event:
+  { client_msg_id: '[---REDACTED---]',
+    type: 'message',
+    text: 'Hello?',
+    user: '[---REDACTED---]',
+    ts: '[---REDACTED---]',
+    team: '[---REDACTED---]',
+    channel: '[---REDACTED---]',
+    event_ts: '[---REDACTED---]',
+    channel_type: 'im' },
+ type: 'event_callback',
+ event_id: '[---REDACTED---]',
+ event_time: 1568375967,
+ authed_users: [ '[---REDACTED---]' ] }"
+ ```
+
+ The relevant info for regular text messages is `body.event.text`, `body.event.channel`, and `body.event.user`. Let's broadcast this over to our hidden workspace. To do this, we need to allow incoming messages to our hidden workspace. We could do this with a webhook like we did at the target workspace, but that's so one page ago. Let's use Slack's [`chat.postMessage`](https://api.slack.com/methods/chat.postMessage) API method! This method will actually allow us to more advanced things like route messages to difference channels without setting up a webhook for each channel.
+
+ In order to use this API endpoint, we'll need an authorization token. Our app actually already has one but not with the correct permissions associated. To get them, we need to request the "chat:write:bot" scope. So head back over to the hidden workspace's app ("Haunt"), click into "OAuth & Permissions", scroll down to "Scopes" and add "chat:write:bot". Again, you'll have to reinstall the app after doing this.
+
+ Once you've done this, scroll up to the top of "Oauth & Permissions" and copy the OAuth token. Let's first test it out using `curl`. Once again, I've created a destination channel for this specific purpose, which I'm calling "the-haunt". Fortunately, Slack let you specify channels by name instead of ID when making posts using `chat.postMessage`:
+
+ ```bash
+ token=PASTE_TOKEN_VALUE_HERE
+ curl https://slack.com/api/chat.postMessage -X POST -H "Authorization: Bearer $token" -H "Content-type: application/json; charset=utf-8" --data '{"text": "Hello", "channel": "the-haunt"}'
+ ```
+
+
+{% include post_image.html name="chat-postMessage.png" width="500px" alt="Incoming chat from postMessage" title="postMessage"%}
+
+With that working, let's now trigger it from our event subscriptions in the target workspace. Head back to out `abigstick-watch` function and change the code to:
+
+ ```js
+ const axios = require('axios');
+ const postUrl = 'https://slack.com/api/chat.postMessage';
+ const token = 'NO TOTALLY DO NOT PASTE YOUR TOKEN IN PLAIN TEXT HERE';
+
+ exports.watch = (req, res) => {
+   const body = req.body;
+   console.log(body)
+
+   const { user, channel, text } = body.event;
+   const data = {
+     text: `*${user}@${channel}:* ${text}`,
+     channel: 'the-haunt',
+   };
+   const headers = {
+     "Authorization": `Bearer ${token}`,
+     "Content-type": "application/json; charset=utf-8"
+   };
+
+   axios({
+     method: "POST",
+     url: postUrl,
+     data,
+     headers,
+   });
+
+   res.status(200).send();
+ };
+ ```
+
+Look, obviously you should store your token in some secure fashion. Since we're using Google Cloud, [Secrets Management](https://cloud.google.com/solutions/secrets-management/) looks like a good solution. AWS has a similar service. All of that is out of scope for this walkthrough, though.
+
+We also need to add axios to package.json, as we did for our abigstick-haunt function. Recall, that will look like this:
+
+```json
+{
+  "name": "sample-http",
+  "version": "0.0.1",
+  "dependencies": {
+    "axios": "^0.19.0"
+  }
+}
+```
+
+With the function saved, since the Slack event subscriptions are already set up, we should be good to go!
+
+{% include post_image.html name="being-watched.png" width="500px" alt="Posting a message in the target workspace" title="Target workspace message"%}
+
+{% include post_image.html name="watching.png" width="500px" alt="Viewing the message in the hidden workspace" title="Hidden workspace channel"%}
+
+As you can see, the user and channel are represented as IDs, not names. I'll leave it as an exercise to the reader to translate these into human readable names -- the quick & dirty method I'm still using is to build an object where the keys are known IDs and the values are the display names. You can, of course, use the Slack API to get these values, but that adds another API call into the workflow, slowing everything down for data that is for the most part entirely static.
