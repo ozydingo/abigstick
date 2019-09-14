@@ -4,7 +4,7 @@ title: "Slacking Around"
 description: "Communicating across Slack workspaces using cloud functions"
 date: 2019-09-12 07:13:00 -0400
 comments: true
-tags: [slack, google cloud functions, lambda, serverless]
+tags: [slack, google cloud functions, lambda, serverless, javascript, async, promises]
 ---
 
 I'm about to lose access to a Slack workspace. Job changes.
@@ -151,7 +151,7 @@ And the confirmation message
 
 {% include post_image.html name="slash-command-confirmed.png" width="500px" alt="Slash command confirmed" title="Slash command confirmed"%}
 
-## Listen up
+## Listen Up
 
 So far we've just created a way to send messages. We also need to be able to receive them! To do this, first let's go ahead and set up another Cloud Function that will handle these messages. I'll create a function called 'abigstick-watch' with the following code.
 
@@ -285,7 +285,7 @@ With the function saved, since the Slack event subscriptions are already set up,
 
 {% include post_image.html name="being-watched.png" width="500px" alt="Posting a message in the target workspace" title="Target workspace message"%}
 
-{% include post_image.html name="watching.png" width="500px" alt="Viewing the message in the hidden workspace" title="Hidden workspace channel"%}
+{% include post_image.html name="watching.png" width="750px" alt="Viewing the message in the hidden workspace" title="Hidden workspace channel"%}
 
 Ok so the user and channel are represented as IDs, not names. Same goes for channels. You can skip this section if the IDs are good enough, or if you just want to hard code the translations into your function, but let's fix that using the Slack API. We're just going to do this inline even though these are static values; it would be more performant but more infrastructure to manage to store these data in some persistence layer. For now, forward.
 
@@ -368,6 +368,8 @@ As noted in the docs for those methods, we actually have to use content type `ap
 
 Armed with all that, here's the code. We're making a little heavier use of promises and async/await, so read up if these constructs confuse you.
 
+<a name="target-to-hidden" />
+
 ```js
 const axios = require('axios');
 const postUrl = 'https://slack.com/api/chat.postMessage';
@@ -388,7 +390,7 @@ function getUserName(userId) {
   }).then(response => {
     console.log('getUserName:', response.data);
     const data = response.data || {}
-	const user = data.user || {};
+    const user = data.user || {};
     const profile = user.profile || {};
     return profile.display_name || profile.real_name || userId;
   }).catch(error => {
@@ -406,7 +408,7 @@ function getChannelName(channelId) {
   }).then(response => {
     console.log('getChannelName:', response.data);
     const data = response.data || {}
-	const channel = data.channel || {};
+    const channel = data.channel || {};
     return channel.name || channelId
   }).catch(error => {
     console.error(error);
@@ -423,7 +425,7 @@ function getGroupName(groupId) {
   }).then(response => {
     console.log('getGroupName:', response.data);
     const data = response.data || {}
-	const group = data.group || {};
+    const group = data.group || {};
     return group.name || group
   }).catch(error => {
     console.error(error);
@@ -481,3 +483,101 @@ exports.watch = async (req, res) => {
 And, success!
 
 {% include post_image.html name="names.png" width="750px" alt="Incoming chats with readable names from postMessage" title="Readable names"%}
+
+## Directed Messages
+
+There's just one more thing we'll do in this post to finish up. We've built the ability to post to our target workspace using a slash command that posts to a webhook set up on that workspace. Let's do one better and allow ourselves to post to any channel we have access to. To do this, we'll ditch the webhook and instead use the same `chat.postMessage` API method we've been using to send messages to the hidden workspace. We'll change the syntax of our command to be `/haunt [CHANNEL] [MESSAGE]`. For good measure, edit the slash command to display this in its help message.
+
+So, still in the Ghost app (the one in the target workspace), add the `chat:write:bot` scope and reinstall. Copy the token again. Now, switching over to the `abigstick-haunt` function -- this should be the one posting to the webhook with the very long URL -- change the code to the following:
+
+<a name="hidden-to-target" />
+
+```js
+const axios = require('axios');
+const token = 'OOPS I DID IT AGAIN';
+const postUrl = 'https://slack.com/api/chat.postMessage';
+
+exports.haunt = (req, res) => {
+  body = req.body;
+  console.log(body);
+  const commandText = body.text;
+  const [ channel, ...messageParts ] = commandText.split(' ');
+  const text = messageParts.join(' ');
+  const data = {
+    channel,
+    text,
+  };
+  const headers = {
+    "Authorization": `Bearer ${token}`,
+    "Content-type": "application/json; charset=utf-8"
+  };
+
+  axios({
+    method: "POST",
+    url: postUrl,
+    data,
+    headers,
+  }).then(res => {
+    axios.post(body.response_url, {text: `Message to ${channel}\n>${text}\nconfirmed.`})
+  }).catch(err => {
+    console.log(err);
+    axios.post(body.response_url, {text: `Message to ${channel}\n${text}\nfailed!`})
+  });
+
+  res.status(200).send("Sending...");
+};
+```
+
+Then, typing two messages:
+
+```
+/haunt general Now I'm Here!
+/haunt random Now I'm There!
+```
+
+And we have success!
+
+{% include post_image.html name="haunt-direction.png" width="750px" alt="Sending message to specific channels" title="Specifying channels"%}
+
+{% include post_image.html name="now-im-here.png" width="750px" alt="Now I'm Here" title="General"%}
+
+{% include post_image.html name="now-im-there.png" width="750px" alt="Now I'm There" title="Random"%}
+
+## Wrapping Up
+
+Well that was a long post. In sum, we've created two-way communication between two Slack workspaces. To do this, we've done the following:
+
+* Created an app in the target workspace called "Ghost" with the following scopes:
+  * channels:history -- to monitor public messages
+  * channels:read -- to get channel info (name))
+  * chat:write:bot -- to post to a channel of our choice
+  * groups:history -- to monitor private channel messages
+  * groups:read -- to get private channel info (name)
+  * im:history -- to monitor direct messages
+  * im:read -- to get direct message info (actually we didn't use this one)
+  * incoming-webhook -- to post via webhook (we ultimately ditched this one)
+  * npim:history - to monitor multi-party messages
+  * npim:read -- to get multi-party message into (didn't use this one either)
+  * users:read -- to get user info (name)
+* Created an app imn the hidden workspace called "Haunt" with the following scopes:
+  * chat:write:bot -- to post to a channel of our choice
+  * commands -- to create slash commands (`/haunt`)
+* Added a slash command `/haunt [channel] [message]` to the Haunt app in the hidden workspace.
+* Created a cloud function to monitor activity on the target workspace and send messages to the hidden workspace
+  * -> [code](#target-to-hidden)
+  * This function needs access to tokens for both workspaces
+* Created a cloud function to send messages from the hidden workspace to the target workspace
+  * -> [code](#hidden-to-target)
+  * This function needs access to the target workspace token
+
+There are so many possible next steps:
+
+* Create a slash command in the target workspace to allow members to send direct messages to a user in the hidden workspace
+* Alternatively, use direct messages to the app to post messages to a special channel in the hidden workspace
+* Create multiple watcher channels and filter specific messages into specified channels. I.e. maybe you don't want just a single channel combining #general, #random, and #catfails with #social and #my_project
+* Allow the ghost app to monitor only specific channels to reduce noise
+* Allow the ghost app to create channels in the hidden workspace to correspond to the channels it is monitoring
+* Deal with attachments, files, images
+* Be even spookier by using the [chat.postEphemeral](https://api.slack.com/methods/chat.postEphemeral) API method
+
+But that'll do fow now.
