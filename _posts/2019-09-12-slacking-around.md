@@ -287,4 +287,197 @@ With the function saved, since the Slack event subscriptions are already set up,
 
 {% include post_image.html name="watching.png" width="500px" alt="Viewing the message in the hidden workspace" title="Hidden workspace channel"%}
 
-As you can see, the user and channel are represented as IDs, not names. I'll leave it as an exercise to the reader to translate these into human readable names -- the quick & dirty method I'm still using is to build an object where the keys are known IDs and the values are the display names. You can, of course, use the Slack API to get these values, but that adds another API call into the workflow, slowing everything down for data that is for the most part entirely static.
+Ok so the user and channel are represented as IDs, not names. Same goes for channels. You can skip this section if the IDs are good enough, or if you just want to hard code the translations into your function, but let's fix that using the Slack API. We're just going to do this inline even though these are static values; it would be more performant but more infrastructure to manage to store these data in some persistence layer. For now, forward.
+
+To get access to the info we need, we need once again to add more scopes.
+
+* users:read -- for users' names via `users.info`
+* im:read -- for direct message info via `conversations.info`
+* groups:read -- for private channel info via `groups.info`
+* channels:read -- for public channel info via `channels.info`
+* npim:read -- for multi-party direct info via `groups.info`
+
+We'll also need to copy this app's token for use in our function. Remeber, the token we were using before was for permission to post to our hidden workspace. This token is for the permissions lister here, which is on the target workspace.
+
+Let's add some functions to translate the various IDs we may get. To keep it all sorted out, let's first list out what events from the different channel types look like.
+
+Direct Message
+
+```
+event: {
+  ...
+  type: 'message',
+  text: '...',
+  user: 'UXXXX1234',
+  channel: 'DXXXX1234',
+  channel_type: 'im'
+  ...
+}
+```
+
+Multi-Party Direct Message
+
+```
+event: {
+  ...
+  type: 'message',
+  text: '...',
+  user: 'UXXXX1234',
+  channel: 'GXXXX1234',
+  channel_type: 'mpim'
+  ...
+}
+```
+
+Private Channel
+
+```
+event: {
+  ...
+  type: 'message',
+  text: '...',
+  user: 'UXXXX1234',
+  channel: 'GXXXX1234',
+  channel_type: 'group'
+  ...
+}
+```
+
+Public Channel
+
+```
+event: {
+  ...
+  type: 'message',
+  text: '...',
+  user: 'UXXXX1234',
+  channel: 'CXXXX1234',
+  channel_type: 'channel'
+  ...
+}
+```
+
+So we'll switch on `channel_type`, and post to the following endpoints depending on its value (you can discover this by trial & error or probably by reading the docs too)
+
+* `im` - `im.info`
+* `mpim` - `group.info`
+* `group` - `group.info`
+* `channel` - `channel.info`
+
+As noted in the docs for those methods, we actually have to use content type `application/x-www-form-urlencoded` for these posts.
+
+Armed with all that, here's the code. We're making a little heavier use of promises and async/await, so read up if these constructs confuse you.
+
+```js
+const axios = require('axios');
+const postUrl = 'https://slack.com/api/chat.postMessage';
+const targetToken = 'OOPS I DID IT AGAIN';
+const hiddenToken = 'HIT ME BABY ONE MORE TIME';
+
+const formHeaders = {
+  "Authorization": `Bearer ${targetToken}`,
+  'Content-type': 'application/x-www-form-urlencoded',
+};
+
+function getUserName(userId) {
+  return axios({
+    method: 'POST',
+    url: 'https://slack.com/api/users.info',
+    data: `user=${userId}`,
+    headers: formHeaders,
+  }).then(response => {
+    console.log('getUserName:', response.data);
+    const data = response.data || {}
+	const user = data.user || {};
+    const profile = user.profile || {};
+    return profile.display_name || profile.real_name || userId;
+  }).catch(error => {
+    console.error(error);
+    return userId;
+  });
+}
+
+function getChannelName(channelId) {
+  return axios({
+    method: 'POST',
+    url: 'https://slack.com/api/channels.info',
+    data: `channel=${channelId}`,
+    headers: formHeaders,
+  }).then(response => {
+    console.log('getChannelName:', response.data);
+    const data = response.data || {}
+	const channel = data.channel || {};
+    return channel.name || channelId
+  }).catch(error => {
+    console.error(error);
+    return userId;
+  });
+}
+
+function getGroupName(groupId) {
+  return axios({
+    method: 'POST',
+    url: 'https://slack.com/api/groups.info',
+    data: `channel=${groupId}`,
+    headers: formHeaders,
+  }).then(response => {
+    console.log('getGroupName:', response.data);
+    const data = response.data || {}
+	const group = data.group || {};
+    return group.name || group
+  }).catch(error => {
+    console.error(error);
+    return groupId;
+  });
+}
+
+function getVarChannelName(channel, channel_type) {
+  switch (channel_type) {
+    case 'im':
+      return Promise.resolve('(IM)');
+    case 'mpim':
+      return Promise.resolve('(MPIM)');
+    case 'group':
+      return getGroupName(channel);
+    case 'channel':
+      return getChannelName(channel);
+    default:
+      return Promise.resolve(channel);
+  }
+}
+
+exports.watch = async (req, res) => {
+  const body = req.body;
+  console.log(body)
+
+  const { user, channel, channel_type, text } = body.event;
+
+  const [userName, channelName] = await Promise.all([
+    getUserName(user),
+    getVarChannelName(channel, channel_type),
+  ]);  
+
+  const data = {
+    text: `*${userName}@${channelName}:* ${text}`,
+    channel: 'the-haunt',
+  };
+  const headers = {
+    "Authorization": `Bearer ${hiddenToken}`,
+    "Content-type": "application/json; charset=utf-8"
+  };
+
+  const response = await axios({
+    method: "POST",
+    url: postUrl,
+    data,
+    headers,
+  });
+  console.log("Response:", response);
+
+  res.status(200).send();
+};
+```
+
+And, success!
+
+{% include post_image.html name="names.png" width="750px" alt="Incoming chats with readable names from postMessage" title="Readable names"%}
