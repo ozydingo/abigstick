@@ -7,19 +7,17 @@ comments: true
 tags: [slack, google cloud functions, lambda, serverless, javascript, async, promises]
 ---
 
-I'm about to lose access to a Slack workspace. Job changes.
+I'm now a member of more Slack workspaces than ever before. That got me thinking. Slack has all sort of bot & API features. Just for fun, can we string up an app that lets us talk to a target workspace from a personal one?
 
-I knew that Slack has some fancy bot & API features, and out of curiosity I wanted to see what I string up to talk to and from this workspace from a personal workspace. Turns out there are several ways to do it, so let's walk through some of them!
+Off the bat and for the record, Slack is pretty good about permissions and will only allow your app permission to do actions that your user account still has access to -- so if you, hypothetically, were to lose access to one workspace, you can't follow this post as written to maintain contact with that workspace.
 
-Off the bat and for the record, Slack is pretty good about this and will revoke permissions to apps and bots that a user creates if they lost access or permissions.
-
-If a coworker sets up the app, however ... well that's a different story.
+If a coworker sets up the app, however ... well that's a different story. I didn't say that.
 
 Throughout this post, we'll be using [Google Cloud Functions](https://cloud.google.com/functions/) using a Node.js 8 runtime. We'll need this for some data translation between the requests originating from one workspace and the other. You can use AWS lambdas or any web server you care to set up if you wish.
 
 ## Create a Slack app
 
-The first thing you need to do is create a slack app. Head over to https://api.slack.com/apps and click "Create New App". You'll need to do this in both workspaces; let's start with the "target" workspace that we're going to lose access to.
+The first thing you need to do is create a slack app. Head over to [https://api.slack.com/apps](https://api.slack.com/apps) and click "Create New App". You'll need to do this in both workspaces; let's start with the "target" workspace that we're going to lose access to.
 
 {% include post_image.html name="create-app.png" width="500px" alt="Create New App dialog" title="Create New App dialog"%}
 
@@ -218,10 +216,10 @@ View the result in the function's log:
  type: 'event_callback',
  event_id: '[---REDACTED---]',
  event_time: 1568375967,
- authed_users: [ '[---REDACTED---]' ] }"
+ authed_users: [ '[---REDACTED---]' ] }
  ```
 
- The relevant info for regular text messages is `body.event.text`, `body.event.channel`, and `body.event.user`. Let's broadcast this over to our hidden workspace. To do this, we need to allow incoming messages to our hidden workspace. We could do this with a webhook like we did at the target workspace, but that's so one page ago. Let's use Slack's [`chat.postMessage`](https://api.slack.com/methods/chat.postMessage) API method! This method will actually allow us to more advanced things like route messages to difference channels without setting up a webhook for each channel.
+ The relevant info for regular text messages is `body.event.text`, `body.event.channel`, and `body.event.user`. Let's broadcast this over to our hidden workspace. To do this, we need to allow incoming messages to our hidden workspace. We could do this with a webhook like we did at the target workspace, but that's so one page ago. Let's use Slack's [chat.postMessage](https://api.slack.com/methods/chat.postMessage) API method! This method will actually allow us to more advanced things like route messages to difference channels without setting up a webhook for each channel.
 
  In order to use this API endpoint, we'll need an authorization token. Our app actually already has one but not with the correct permissions associated. To get them, we need to request the "chat:write:bot" scope. So head back over to the hidden workspace's app ("Haunt"), click into "OAuth & Permissions", scroll down to "Scopes" and add "chat:write:bot". Again, you'll have to reinstall the app after doing this.
 
@@ -287,7 +285,7 @@ With the function saved, since the Slack event subscriptions are already set up,
 
 {% include post_image.html name="watching.png" width="750px" alt="Viewing the message in the hidden workspace" title="Hidden workspace channel"%}
 
-Ok so the user and channel are represented as IDs, not names. Same goes for channels. You can skip this section if the IDs are good enough, or if you just want to hard code the translations into your function, but let's fix that using the Slack API. We're just going to do this inline even though these are static values; it would be more performant but more infrastructure to manage to store these data in some persistence layer. For now, forward.
+While I've blacked them out, if you follow along you'll see that the user and channel are represented as IDs, not names. You can skip this next section if the IDs are good enough, or if you just want to hard code the translations into your function, but let's fix that using the Slack API. We're just going to do this inline even though these are static values; it would be more performant but more infrastructure to manage to store these data in some persistence layer. For now, forward.
 
 To get access to the info we need, we need once again to add more scopes.
 
