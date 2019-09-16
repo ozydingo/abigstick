@@ -125,9 +125,9 @@ Let's illustrate.
 {% include post_image.html name="closure-2.png" width="500px" alt="Effect function uses cancel in its owns scope" title="Inner scope"%}
 </div>
 
-Rounded rectangles represent scope boundaries that help understand what a given closure has access to. In the image on the right, once the value of `cancel` is copied from the outer scope to the inner, further updates to the outer `cancel` have no effect on the inner value. So the cleanup function does not effect `fetchToken`, and we get our error.
+Rounded rectangles represent scope boundaries that help understand what a given closure has access to. In the image on the right, the name `cancel` takes on new meaning inside the `fetchToken` function. Thus reassigning that variable name to a new value outside that function does not affect the value of the named variable inside.
 
-To fix this, I landed on a solution that also alleviates my discomfort defining the fetch function inside the effect call. It takes advantage of shallow copying in Javascript.
+To fix this, I we can pass in an Object where `cancel` is a field. Reassigning `fetchState` would have the same non-effect, but modifying its data is a different story. Both references to `fetchState` point to the same data -- the same copy of the `cancel` field.
 
 ```js
 function Child(props) {
@@ -156,10 +156,8 @@ function Child(props) {
 
 Testing this out, it works beautifully. (Add in a `console.log` in the cancel check to convince yourself).
 
-But wait, didn't we just decide that passing the `cancel` variable into the fetch function didn't work? Ah, but in this case, we're not simply passing in the cancel boolean, we're passing in an Object that contains a reference to that boolean.
-
 {% include post_image.html name="closure-ref.png" width="475px" alt="Fetch function uses reference to cancel boolean" title="Reference"%}
 
-Here, the "cancel" value is in a lavenderany given closure has direct access to, but a field that both copies of `fetchState` point to. I actually rather like this solution better since it allows separation of the fetch function from the effect function's scope, making it far more reusable and testable.
+Here, the `cancel` value is illustrated as a lavender ellipse as it is not a named variable that either closure has direct access to. Instead it is a value (field) that both versions of `fetchState` point to. I actually rather like this solution better since it allows separation of the fetch function from the effect function's scope, making it far more reusable and testable.
 
 Until AbortControllers come onto the scene in a more stable way, that's all, folks!
