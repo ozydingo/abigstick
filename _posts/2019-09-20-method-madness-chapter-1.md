@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Method Madness: Part 1"
+title: "Method Madness: Chapter 1"
 description: "Binding and unbinding methods in Ruby"
 date: 2019-09-20 06:59:00 -0400
 comments: true

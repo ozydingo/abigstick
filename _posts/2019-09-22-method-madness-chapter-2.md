@@ -1,7 +1,7 @@
 ---
 layout: post
-title: "Method Madness: Part 2"
-description: "Using class methods to remember how to figure out what Ruby's singleton_class is"
+title: "Method Madness: Chapter 2"
+description: "How class methods in Ruby totally explain the \"singleton class\" thing"
 date: 2019-09-22 18:11:00 -0400
 comments: true
 tags: [Ruby, Metaprogramming, Methods]
