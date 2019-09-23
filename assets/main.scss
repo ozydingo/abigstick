@@ -56,6 +56,11 @@
   padding-bottom: 16px;
 }
 
+.post-image {
+  border-radius: 5px;
+  box-shadow: 1px 2px 6px #777a;
+}
+
 pre.highlight {
   border-radius: 1em;
   box-shadow: 1px 2px 6px #777;
@@ -90,12 +95,12 @@ code span.inline-value {
 
 .output {
   font-family: monospace;
-  background: #bbb8;
+  background: #aaa8;
   padding: 0.3em;
   margin-bottom: 1em;
   white-space: pre;
   overflow-x: scroll;
-  box-shadow: inset 1px 2px 3px #0008;
+  box-shadow: inset 1px 2px 5px #0007;
 }
 
 .skip-link {
