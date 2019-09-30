@@ -1,4 +1,4 @@
-.page-background {
+.abigstick {
   background-image: url("/assets/images/bigstick1.jpg");
   background-repeat: no-repeat;
   background-attachment: fixed;
@@ -6,7 +6,7 @@
 }
 
 .page-content {
-  background-color: rgba(0,0,0,0.4);
+  background-color: $grey-color-light;
 }
 
 .wrapper {
@@ -15,15 +15,7 @@
 
 .whitebox {
   width: 100%;
-  background-color: rgba(255,255,255,0.87);
-  box-shadow: 0px 0px 8px 2px rgba(255,255,255,0.6);
-  padding: 15px;
-  transition-property: background-color;
-  transition-duration: 0.4s;
-
-  &:hover {
-    background-color: rgba(255,255,255,0.9);
-    transition-property: background-color;
-    transition-duration: 0.4s;
-  }
+  background-color: #fff;
+  box-shadow: 1px 2px 5px 0px rgba(0,0,0,0.2);
+  padding: 15px 30px;
 }
