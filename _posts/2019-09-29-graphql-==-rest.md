@@ -9,17 +9,15 @@ tags: [GraphQL, REST, hot-takes]
 
 I was going to write a post about creating a Javascript GraphQL client from scratch.
 
-But, see, I only recently started using it. There were things I didn't know. I was missing some common patterns of using GraphQL. Namely, persisted queries, operation documents, and how to use variables correctly. If you don't know what these are, it's not important right now. The point is that when looking into these things and if my awesome Javascript GraphQL client was generally useful, I realized that these things made it, well, not.
+But as I started looking into standard methods for doing what I wanted to build, I started to realize how much of it was completely unnecessary with the concepts including persisted queries and operation documents. If you don't know what these are, it's not important right now. The point is that when looking into these things and if my awesome Javascript GraphQL client was generally useful, I realized that these things made it, well, not.
 
 And that's when it hit me. Adopting these GraphQL patterns simultaneously makes GraphQL cleaner and more efficient, and makes it REST.
 
 ## GraphQL > REST
 
-Disclaimer. I'm not an expert in the finer nuances of REST. If you are, excellent! Tell me how I'm wrong in the comments, please! But I, like many others, have shunned REST as a detailed methodology because it wasn't well matched to most of the functionality I ever wanted to implment as a developer. You know, the old "we're writing apps, not documents" idea, like {% include external_link.html text="here" href="https://www.freecodecamp.org/news/rest-apis-are-rest-in-peace-apis-long-live-graphql-d412e559d8e4/" %}.
+Disclaimer. I'm not an expert in the finer nuances of REST. If you are, excellent! Tell me how I'm wrong in the comments, I'm sure I am. But I, like many others, have shunned REST for being not well matched to most of the functionality I've ever wanted to implement as a developer. You know, the old "we're writing apps, not documents" idea, like {% include external_link.html text="here" href="https://www.freecodecamp.org/news/rest-apis-are-rest-in-peace-apis-long-live-graphql-d412e559d8e4/" %}.
 
-
-
-And don't get me wrong. I still prefer writing client-server interactions in GraphQL. See, I'm simultaneously holding the seemingly contradictory statements: {% include external_link.html text="GraphQL > REST" href="https://www.howtographql.com/basics/1-graphql-is-the-better-rest/" %} and [GraphQL == REST](#).
+And, look, I do loveAnd don't get me wrong. GraphQL is still my go-to for defining a client-server API. Everyone's allowed a little doublethink, right? I can believe both that {% include external_link.html text="GraphQL > REST" href="https://www.howtographql.com/basics/1-graphql-is-the-better-rest/" %} and [GraphQL == REST](#).
 
 I love GraphQL. It's the best! It's also REST.
 
@@ -244,23 +242,29 @@ For example, we built the following query:
 
 So I should just store that query somewhere. Why use all this `QueryBuilder` nonsense?
 
-Enter GraphQL documents and persisted queries. This, among any other static queries, get stored server-side, and referred to by name or id. Less data transferred in each request, yay! Plus, you get
+Enter GraphQL documents and persisted queries. Your static query strings get stored server-side and can be referenced by name or id. Less data transferred in each request, yay! This also makes implementing cached requests easier as each operation is pre-defined and often repeated, keyed only by a smaller set of variables.
 
-1. Pre-defined operation names that deliver fixed, predictable data shapes and values. GraphQL calls these "operations" but right now I'm going to call it a "route".
-2. For each route in (1), a known set of arguments that the client must provide to determine the specific data sent back. GraphQL calls these arguments, but I'm going to call them "parameters".
+So, in sum, we've solidified our GraphQL API by adding:
 
-So a specified route gives back a given data shape, let's call it a "resource", and to get this resource you need to tell the server which route you are interested and perhaps specify some parameters.
+1. Pre-defined operation names stored on the server. "Routes", if you will.
+2. Fixed data shapes for each operation. Let's call these "resources."
+3. A small set of client-specified variables, or "parameters" for each resource.
+4. Cacheable resources for improved performance.
 
 Sounds a lot like REST.
 
 ## I don't GET it
 
-Ok, but so far I've only described GET-style REST requests. What about PUT, PATCH, DELETE?
+Ok, but so far I've only described read operations. The "R" in C<b>R</b>UD. The GET in the pointless mess that is http verbs. What about the other resource lifecycle operations, <b>C</b>reate, <b>E</b>dit, and <b>D</b>elete? What about the PUTs and the POSTs and the DELETEs?
 
-These are all mutations, and the exact same principle applies. You store the static mutation strings in a document with named operations, and you supply the server with the operation name (route) and parameters. Your `assignWidgetToBoxMutation` mutation is just a PUT operation where you are PUTting an "assignWidgetToBoxMutation" resource. It has side effects on resources such as the specified Box and Widget records. But realistically so does any REST operation in a modern app. At the very least each one is updating your user record to update your `last_logged_in` status, and more likely there are a number of other resources that are updated in any non-trivial request.
+Wait, which of these are technically part of REST again?
+
+In GraphQL, anything remotely described by the above would be implemented by a GraphQL mutation. Some mutations (let's say `renameWidget` or `deleteWidget`) might be simply mapped to update or delete actions. But I'm going to blow past all that and call all operations create actions. Just like before, we store all of our mutation query strings on the server. The client simply has to name which operation it wants to perform. So your `assignWidgetToBoxMutation` mutation is simply asking the server to *create* an instance of that mutation. And it does. How it persists that data, what side effects it has, and whether or not you can directly *read* the same resource back is up to the server.
+
+Realistically, the same is true for any server action no matter what methodology itt claims to follow. Sure, you just issued a standard update request for your widget, but the server created a transaction record, updated your user record for logged in time, modified your update due to business logic, and spun up a background job to recompute your widget optimization.
 
 ## GraphQL >= REST
 
-Let's take a step back. Try not to panic or chop my head off. I like my head. I am, in fact, being a little esoteric, which is funny from a self-professed REST-apathist. I still love GraphQL. It makes you structure your API more sensibly, encouraging you right from the start to dissociate your API operations (aka "resources") definitions from your back-end models (aka "resources") by building a layer in between them with a well-defined schema. This is whaat happens to any reasonably non-trivial web app trying to use REST-style controllers anyway. GraphQL gives that process structure, makes it easy to develop, and is just damn pleasant to work with.
+Let's take a step back. Try not to panic or chop my head off. I like my head. I am, in fact, being a little esoteric, which is perhaps a little funny from a self-professed REST-apathist. I still love GraphQL. It makes you structure your API more sensibly, encouraging you right from the start to dissociate your API operations (aka "resources") definitions from your back-end models (aka "resources") by building a layer in between them with a well-defined schema. This is whaat happens to any reasonably non-trivial web app trying to use REST-style controllers anyway. GraphQL gives that process structure, makes it easy to develop, and is just damn pleasant to work with.
 
 But once the honeymoon is over, you realize that all you really need now is a little REST.
