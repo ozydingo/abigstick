@@ -1,0 +1,29 @@
+.page-background {
+  background-image: url("/assets/images/bigstick1.jpg");
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-size: 100%;
+}
+
+.page-content {
+  background-color: rgba(0,0,0,0.4);
+}
+
+.wrapper {
+  min-width: 80%;
+}
+
+.whitebox {
+  width: 100%;
+  background-color: rgba(255,255,255,0.87);
+  box-shadow: 0px 0px 8px 2px rgba(255,255,255,0.6);
+  padding: 15px;
+  transition-property: background-color;
+  transition-duration: 0.4s;
+
+  &:hover {
+    background-color: rgba(255,255,255,0.9);
+    transition-property: background-color;
+    transition-duration: 0.4s;
+  }
+}
