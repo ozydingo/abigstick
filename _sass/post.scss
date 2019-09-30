@@ -1,0 +1,57 @@
+.post-title-in-list {
+  font-size: 2em;
+
+  a {
+    color: #311;
+  }
+}
+
+.post-description {
+  font-size: 1em;
+  font-style: italic;
+  color: #444;
+}
+
+.post-description-in-list {
+  color: #606060;
+  font-style: italic;
+}
+
+.post-list-spacer {
+  padding-bottom: 16px;
+}
+
+.post-date {
+  margin-right: 10px;
+  color: #555;
+}
+
+.tag-list {
+  padding-bottom: 5px;
+}
+
+.post-tag {
+  font-size: 0.85em;
+  background-color: rgb(238, 238, 255);
+  color: #000;
+  border-radius: 0.25em;
+  box-shadow: 1px 2px 3px #7778;
+  display: inline;
+  padding: 2px 4px 2px 4px;
+  margin-right: 3px;
+}
+
+.post-image {
+  border-radius: 5px;
+  box-shadow: 1px 2px 6px #777a;
+}
+
+.skip-link {
+  font-size: small;
+  a {
+    color: #777;
+    &:hover {
+      color: #347;
+    }
+  }
+}

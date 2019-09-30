@@ -2,6 +2,9 @@
 ---
 
 @import "minima";
+@import "header";
+@import "post";
+@import "markup";
 
 .page-background {
   background-image: url("/assets/images/bigstick1.jpg");
@@ -31,114 +34,4 @@
     transition-property: background-color;
     transition-duration: 0.4s;
   }
-}
-
-.post-title-in-list {
-  font-size: 2em;
-
-  a {
-    color: #311;
-  }
-}
-
-.post-description {
-  font-size: 1em;
-  font-style: italic;
-  color: #444;
-}
-
-.post-description-in-list {
-  color: #606060;
-  font-style: italic;
-}
-
-.post-list-spacer {
-  padding-bottom: 16px;
-}
-
-.post-image {
-  border-radius: 5px;
-  box-shadow: 1px 2px 6px #777a;
-}
-
-pre.highlight {
-  border-radius: 1em;
-  box-shadow: 1px 2px 6px #777;
-  background-color: rgb(238, 238, 255);
-}
-
-code {
-  border-radius: 0.25em;
-  box-shadow: 0.5px 1px 1px #7778;
-  background-color: rgb(238, 238, 255);
-}
-
-pre code {
-  box-shadow: none;
-}
-
-code span.added {
-  color: #395;
-}
-
-code span.modified {
-  color: #aa3;
-}
-
-code span.unmodified {
-  color: #aaa;
-}
-
-code span.inline-value {
-  color: #a63;
-}
-
-.output {
-  font-family: monospace;
-  background: #aaa8;
-  padding: 0.3em;
-  margin-bottom: 1em;
-  white-space: pre;
-  overflow-x: scroll;
-  box-shadow: inset 1px 2px 5px #0007;
-}
-
-.skip-link {
-  font-size: small;
-  a {
-    color: #777;
-    &:hover {
-      color: #347;
-    }
-  }
-}
-
-.filename {
-  text-decoration: underline;
-}
-
-.resource-name {
-  font-family: monospace;
-  color: #844;
-  background-color: rgba(0,0,0,0.1);
-}
-
-.post-date {
-  margin-right: 10px;
-  color: #555;
-}
-
-.tag-list {
-  padding-bottom: 5px;
-}
-
-.post-tag {
-  font-size: 0.85em;
-  background-color: rgb(238, 238, 255);
-  color: #000;
-  border-radius: 0.25em;
-  box-shadow: 1px 2px 3px #7778;
-  display: inline;
-  padding: 2px 4px 2px 4px;
-  margin-right: 3px;
 }
