@@ -28,7 +28,9 @@ Don't do that.
 
 ## But what if we did that?
 
-Ok, let's not do *exactly* that but what can we do that's similar? Let's start by defined a new thing called "nothing".
+Ok, let's not do *exactly* that but what can we do that's similar? Obviously we don't want to actually change `nil` for everyone, but what if we could do it just on demand? That is, without breaking the rest of Ruby, what if we could declare a specific object as one for which we currently do not care about further `nil`s?
+
+`nil` is a singleton, so we actually can't modify it unless doing so globally. But we can roll our own. Let's start by establishing a pattern in a new object called "nothing".
 
 ```ruby
 require 'singleton'
@@ -45,7 +47,7 @@ class NothingClass
   end
 end
 
-# Give all objects the ability to know if they are the One True None
+# Give all objects the ability to know if they are the One True Nothing
 module Kernel
   def nothing?
     self.eql?(NothingClass.instance)
@@ -54,6 +56,9 @@ end
 
 nothing = NothingClass.instance
 # => nothing
+```
+
+```ruby
 nothing.nothing?
 # => true
 nothing.thing.another_thing
@@ -62,9 +67,9 @@ nothing.thing.another_thing
 # => false
 ```
 
-We've defined a method `nothing?` in `Kernel` that operates similarly to `nil?` (also defined on `Kernel`) so we can check for nothingness. But how do we get there?
+We've defined a method `nothing?` on `Kernel` that operates similarly to `nil?` (also defined on `Kernel`) so we can check for nothingness. But how do we get there?
 
-Remember, our goal is to get as close to auto-safe-navigation (`&.`) as possible. Our first attempt is a method that you can call when you're in danger of being `nil`:
+Remember, our goal is to mimic safe-navigation (`&.`) automatically. Our first attempt is a method that you can call when you're in danger of being `nil`.
 
 ```ruby
 module Kernel
@@ -76,19 +81,20 @@ module Kernel
     nil? ? NothingClass.instance : self
   end
 end
+```
 
+We're going to use the [hashie](https://github.com/intridea/hashie) gem because it gives us a rich set of nested method calls that we might use to probe for data (similar to using ActiveRecord model associations and attributes)
+
+```ruby
 require 'hashie'
 data = Hashie::Mash.new({x: "hello", y: "world"})
-
-data.x.nothingify.upcase.replace(/[eE]/,'3')
+data.x.nothingify.upcase.gsub(/[eE]/,'3')
 # => "H3LLO"
-data.a.nothingify.upcase.replace(/[eE]/,'3')
+data.a.nothingify.upcase.gsub(/[eE]/,'3')
 # => nothing
 ```
 
-Now if we have an object that might be `nil`, we can call `nothingify` on it to be safe from any immediate danger of `NoMethodError`s on `nil`.
-
-But if our `nil` comes anywhere further down the chain, we're still boned:
+Now if we have an object that might be `nil`, we can call `nothingify` on it to be safe from any immediate danger of `NoMethodError`s on `nil`. But as little more than a glorified `try`, if our `nil` comes anywhere further down the chain, we're still boned:
 
 ```ruby
 require 'hashie'
@@ -97,9 +103,13 @@ response.nothingify.data.x
 # => "hello"
 response.nothingify.oops.x
 # NoMethodError: undefined method `x' for nil:NilClass
+response.nothingify.oops.nothingify.x
+# => nothing
 ```
 
-This happens because while `response.nothingify` would save us if `response` itself were `nil`, `response.oops` still returns `nil`, and therefore `response.nothingify.oop` also returns `nil`, and we're not calling `nothingify` on the resulting return value. So we really want a single call to `nothingify` to perpetually call `nothingify` on any downstream result.
+The error occurs because `response.nothingify.oops` is still `nil`, since `nothingify` simply returned `self`. We can't call `x` on `nil`.
+
+What we really want is for a single call to `nothingify` to perpetually call `nothingify` on any downstream result.
 
 Can we do that?
 
@@ -108,10 +118,10 @@ Can we do that?
 ```ruby
 module DeepNothing
   CANT_TOUCH_THIS = [
+    :nothingify,
     :deep_nothing,
     :nil?,
     :methods,
-    :nothingify,
     :define_singleton_method,
     :convert_key,
   ]
@@ -148,28 +158,37 @@ response.nothingify.oops.x
 # => nothing
 ```
 
-Ok, a brief explanation. In the mmodule `DeepNothing`, we're defining a single method, `deep_nothing`, that converts our object into our nothing-safe object that we want. It does this by redefining (almost) *all* of its methods with a wrapper that `nothingify`s the result. We wrap *almost* all of the moethods because (1) we can't wrap `nothingify` itself or any methods called in `nothingify` (`nil?` and `deep_nothing`) or we'll get in an infinite loop, and (2) we can't redefine methods that we're trying to use inside our method redefinition such as `define_singleton_method`. Everything else gets wrapped. (Except for `convert_key`, which for some reason causes trouble `puts`ing a `Hashie::Mash` that I cannot figure out).
+Success! (Still a terrible idea.)
 
-Now when `response` gets `nothingify`d, any method called on it automatically gets `nothingify`d too. Rinse, call, repeat!
+Ok, a brief explanation. The method `deep_nothing` nothing-safes our object by redefining (almost) *all* of its methods with a wrapper that `nothingify`s the return value. So a `nil` return gets turned into `nothing`, and any other return value get re-`nothingify`'d.
 
-One edge-case issue with this approach is singleton methods don't work:
+We only wrap *almost* all of the moethods because
+
+1. We can't wrap `nothingify` itself (or any methods called therein, namely, `nil?` and `deep_nothing`) otherwise we'll get in an infinite loop calling `nothingify` repeatedly
+2. We can't redefine methods that we're trying to use inside our method redefinition: `methods` and `define_singleton_method`.
+
+Everything else gets wrapped. (Except for `convert_key`, which causes trouble `puts`ing a `Hashie::Mash` for some reason that I cannot figure out).
+
+Now we can `nothingify` an object once and thereafter be assured to not be bothered by that pesky, no good `NoMethodError` thing.
+
+## Back to the Singleton
+
+One edge-case issue with this approach is singleton methods don't work because they don't have a `super`. Normally, `super` in this context refers to the original instance method defined by the class. For singleton methods, this doesn't exist.
 
 ```ruby
 obj = Object.new
+# define a stingleton method with no relation to the class
 def obj.hello
   "world"
 end
 
 obj.hello
 # => "world"
-
-# Redefined all methods including `hello`, which has no super
-obj.nothingify
-obj.hello
+obj.nothingify.hello
 # NoMethodError: super: no superclass method `hello' for #<Object:0x007fb472243280>
 ```
 
-We can fix that by using [method binding](2019/09/20/method-madness-chapter-1) instead of `super`:
+We can fix that by using [method binding](/2019/09/20/method-madness-chapter-1) instead of `super`:
 
 ```ruby
 module DeepNothing
@@ -193,7 +212,11 @@ module DeepNothing
     return self
   end
 end
+```
 
+Here, when we redefine a method, we first save a reference to the original method. We then call that original method inside our redefined method. No `super`, just the original result.
+
+```ruby
 obj = Object.new
 def obj.hello
   "world"
@@ -201,16 +224,11 @@ end
 
 obj.hello
 # => "world"
-
-# Redefined all methods including `hello`, which has no super
-obj.nothingify
-obj.hello
+obj.nothingify.hello
 # => "world"
 ```
 
-Here, when we redefine a method, we first save a copy of the original method, and call it in our redefined method.
-
-But then there's truthiness.
+And then there's truthiness.
 
 ## Nothing is true
 
@@ -221,4 +239,4 @@ print "Something" if nothing
 # Something
 ```
 
-Unfortunately there just isn't a way around this (prove me wrong in the comments, I beg you!). Ruby, for all its flexibility, doesn't let you do some things, and defining truthiness is one of them. In this day and age, perhaps we can take some comfort in that.
+Unfortunately there just isn't a way around this (prove me wrong in the comments, I beg you!). Ruby, for all its flexibility, doesn't let you do some things, and defining truthiness is one of them. Perhaps, in this day and age, we can take some comfort in that.
