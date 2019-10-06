@@ -51,11 +51,11 @@ Classes define methods available to their instances. `Class` is no different; it
 
 So how do we get a class method for *just* `MyClass`? When we define one by putting it on `Class`, it becomes available to every class ever. No good. We need a place to define the method where it can only be accessed by the single instance `MyClass`.
 
-That's where singleton classes come in.
+That's where singleton classes come in. Every object in Ruby has a singleton class, which is a class whose *only* instance is that object. So a method defined on a class' singleton class is exactly where its class methods can live without affecting other classes.
 
 ## Class Methods
 
-Class methods in Ruby were always little weird. No mention of "static" methods like in other OOP languages. Instances can't call class methods. It's because a class method is really just an instance method for your `Class` instance. Defining class methods looks strange -- and wrapping your head around this method of doing so unlocks the whole puzzle:
+Class methods in Ruby were always little weird. No mention of "static" methods like in other OOP languages. Instances can't call class methods. Defining class methods looks strange. But wrapping your head around this method of doing so unlocks the whole puzzle:
 
 ```ruby
 class MyClass
@@ -73,12 +73,15 @@ def MyClass.class_method
 end
 ```
 
-This is the same thing as another Ruby oddity you may have wondered about: the ability to define methods only for a single object.
+If you're familiar enough with Ruby's oddities, you know that this is a way to define a method *only* for a single object. In this case, that object is `MyClass`. Everything is an object.
+
+If you're not that familiaar with this method of defining methods, it goes like this:
 
 ```ruby
 obj1 = MyClass.new
 obj2 = MyClass.new
 
+# define the method `whisper` only for obj1, with no relation to obj2 or MyClass
 def obj1.whisper
   "Shhh"
 end
@@ -87,32 +90,38 @@ obj1.whisper
 # => ""Shhh"
 obj2.whisper
 # NoMethodError (undefined method `whisper' for #<MyClass:0x00007f886c915900>)
+MyClass.new.whisper
+# NoMethodError (undefined method `whisper' for #<MyClass:0x00007fddad851aa0>)
 ```
 
-In both cases, using `def something.method` defines a method available only to `something`. When `something` is a class, hey presto you have class method. But how does this work under Ruby's rules?  Where does that method definition live? Remember, classes contain methods for their instances. So what class is there that can hold a method for just `obj1` or just `MyClass`?
+In both cases, using `def something.method` defines a method available only to `something`. When `something` is a class, hey presto you have class method.
+
+Methods are defined on classes. On what class is `whisper` defined such that it applies to just `obj1` and not `obj2` or any other instance of `MyClass`? Same question: where does a class method for `MyClass` live such that it applies only to `MyClass` and no other instace of `Class`?
 
 ## The Singleton Class
 
-The solution to the above is how we arrive at singleton classes. `MyClass` is not just an instance of `Class`. We'll also define another class that `MyClass` is an instance of and the *only* instance of. `MyClass` is this class' singleton instance, and that's why we call it the singleton class.
+The solution to the above is how we arrive at singleton classes. `MyClass` may be an instance of `Class`. But it's also an instance -- the singleton instance -- of another class called its singleton class.
 
 ```ruby
-s = MyClass.singleton_class
+klass = MyClass.singleton_class
 # => #<Class:MyClass>
-MyClass.is_a?(s)
+MyClass.is_a?(klass)
 # => true
-s.instance_methods(false)
+klass.instance_methods(false)
 # => [:class_method]
 ```
 
-That's it -- the singleton class is just a place for these methods to live that allow us to have class methods in Ruby under the mandate that every class is an instance of `Class`.
+Notice that `class_method` is an *instance method* of `klass`, making it a *class method* of `MyClass`. This is because `MyClass` is an instance of `klass`. Everything is an object.
+
+And that's it -- the singleton class is just a place for these methods to live that allow us to have class methods in Ruby under the mandate that every class is an instance of `Class`.
 
 {% include post_image.html name="singleton-classes.png" width="700px" alt="Loading token" title="Loading token"%}
 
-And if you think this forked method lookup is a little inelegant for Ruby, well, keep reading.
+But wait, this diagram of method lookup seems a little inelegant for Ruby. Keep reading, friend.
 
 ## Singleton Classes and Inheritance
 
-There's another critical feature fo singleton classes: they are inherited by a class' subclasses.
+There's another critical feature fo singleton classes. If a class gets subclassed, then the singleton class does too. This is how subclasses can call class methods of their parent classes.
 
 ```ruby
 class MySubclass < MyClass
@@ -122,7 +131,7 @@ MySubclass.class_method
 #  => "Some class method"
 ```
 
-The way this happens is that `MySubclass`'s singleton class is declared as a subclass of `MyClass`'s singleton class.
+For this to happen, `MySubClass`'s singleton class must be a subclass of `MyClass`'s singleton class.
 
 ```ruby
 s1 = MyClass.singleton_class
@@ -133,11 +142,13 @@ s1.equal?(s2)
 # => true
 ```
 
-So when an instance object such as `obj1` or `MySubclass` calls a method, it looks up that method definition first from its singleton class<sup>* </sup>, then from that singleton class' ancestors. <small><i>* -- including any included modules</i></small>
+So when an instance object such as `obj1` or `MySubclass` calls a method, it looks up that method definition first from its singleton class<sup>* </sup>, then from that singleton class' ancestors.
 
-So when does the method lookup chain switch and start looking at an instance's class instead of its singleton class's ancestry chain?
+<small><i>* -- including any included modules</i></small>
 
-It doesn't have to.
+So when does the method lookup chain switch over to start looking for methods in an object's regular class instead of its singleton class ancestry?
+
+It doesn't have to. An object's class *is* a part of its singleton class ancestry. Let's print the whole thing out.
 
 ```ruby
 klass = MySubclass.singleton_class
@@ -155,7 +166,7 @@ end
 # BasicObject
 ```
 
-The key is that `BaseObject`'s singleton class is a subclass of `Class`. So method lookup only follows one rule: start at the singleton class, and walk up the ancestry chain until you're done.
+The key to this working is that `BasicObject`'s singleton class (`#<Class:BasicObject>`) is a subclass of `Class`. So method lookup only follows one rule: start at the singleton class, and walk up the ancestry chain until you're done.
 
 What about singleton methods of non-`Class` objects?
 
@@ -173,7 +184,11 @@ end
 # BasicObject
 ```
 
-`obj`'s singleton class is a subclass of `MySubclass` itself. So using the same singleton rule, a method called on `obj` will get to look in `MySubclass` for a definition, but only after first looking at `obj`'s singleton class.
+`obj`'s singleton class is a subclass of `MySubclass` itself. Same logic: `obj`'s singleton class is a subclass of `obj`'s class (`MySubclass`), just as `BasicObject`'s singleton class is a subclass of `BasicObject`'s class (`Class`).
+
+The only difference Ruby would need to be aware of is that when defining a singleton class for an object, its parent class is the objects's parent class if it has one, or the object's class if it doesn't.
+
+So method lookup is dead simple. Start at the singleton class and go up the chain of ancestry. When we call a method on `obj`, we will eventually look for a definition in `MySubclass` using this rule, but only after first looking at `obj`'s singleton class.
 
 ## A final thought: class << self
 
