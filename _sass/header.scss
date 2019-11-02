@@ -6,7 +6,7 @@
 }
 
 .headspace {
-  height: 5rem;
+  height: 1rem;
   width: 100%;
 }
 
@@ -26,10 +26,13 @@
   display: flex;
   flex-direction: row;
   text-shadow: #000 0 0 2px 2px;
+  box-shadow: 2px 3px 5px 0px rgba(0,0,0,0.4);
+  border: 1px solid #4f4f4f;
 }
 
 .header-banner {
   // background-color: #141824;
+  backdrop-filter: blur(9px) brightness(60%);
   padding: 1rem;
   box-sizing: border-box;
   min-height: $spacing-unit * 1.865;
