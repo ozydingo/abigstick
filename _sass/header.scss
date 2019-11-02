@@ -1,6 +1,6 @@
 .site-header {
   position: sticky;
-  height: 300px;
+  height: 320px;
   top: calc(5rem - 300px);
   width: 100%;
 }
@@ -8,6 +8,7 @@
 .headspace {
   height: 1rem;
   width: 100%;
+  // backdrop-filter: blur(3px) brightness(90%);
 }
 
 .head-image {
@@ -18,25 +19,28 @@
   // background-position: center;
 }
 
-.head-content {
-  height: 300px;
-  width: 80%;
-  padding: 1rem;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: row;
-  text-shadow: #000 0 0 2px 2px;
-  box-shadow: 2px 3px 5px 0px rgba(0,0,0,0.4);
-  border: 1px solid #4f4f4f;
-}
-
 .header-banner {
+  height: 100%;
   // background-color: #141824;
   backdrop-filter: blur(9px) brightness(60%);
   padding: 1rem;
   box-sizing: border-box;
   min-height: $spacing-unit * 1.865;
   text-shadow: 1px 1px 4px #000;
+  display: flex;
+  justify-content: center;
+  box-shadow: 2px 3px 5px 0px rgba(0,0,0,0.4);
+}
+
+.head-content {
+  height: 100%;
+  width: 75%;
+  padding: 1rem;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  text-shadow: #000 0 0 2px 2px;
+  border: 1px solid #4f4f4f;
 }
 
 .title-content {
