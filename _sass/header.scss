@@ -1,3 +1,15 @@
+.site-header {
+  position: sticky;
+  height: 300px;
+  top: calc(5rem - 300px);
+  width: 100%;
+}
+
+.headspace {
+  height: 5rem;
+  width: 100%;
+}
+
 .head-image {
   border-radius: 15px;
   background-image: url("/assets/images/bigstick-dark.jpg");
@@ -16,8 +28,8 @@
   text-shadow: #000 0 0 2px 2px;
 }
 
-.site-header {
-  background-color: #141824;
+.header-banner {
+  // background-color: #141824;
   padding: 1rem;
   box-sizing: border-box;
   min-height: $spacing-unit * 1.865;
