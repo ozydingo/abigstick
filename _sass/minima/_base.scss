@@ -2,7 +2,10 @@
  * Basic styling
  */
 body {
-  font: $base-font-weight #{$base-font-size}/#{$base-line-height} $base-font-family;
+  font-family: 'Lato', #{$base-font-family};
+  font-weight: $base-font-weight;
+  font-size: #{$base-font-size};
+  line-height: #{$base-line-height};
   color: $text-color;
   background-color: $background-color;
   -webkit-text-size-adjust: 100%;
@@ -21,6 +24,10 @@ body {
  */
 img {
   max-width: 100%;
+}
+
+h1, h2, h3, h4 ,h5, h6 {
+  font-family: 'Raleway', #{$base-font-family};
 }
 
 /**
