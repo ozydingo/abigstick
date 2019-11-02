@@ -35,6 +35,9 @@
 .head-nav {
   flex: 0 0 auto;
   text-align: right;
+  color: #fafafa;
+  opacity: 0.75;
+  @include relative-font-size(1.2);
 }
 
 .site-title {
@@ -42,13 +45,4 @@
   font-weight: 300;
   letter-spacing: 2px;
   margin-bottom: 0;
-
-  @include media-query($on-palm) {
-    padding-right: 45px;
-  }
-
-  &,
-  &:visited {
-    color: #fff;
-  }
 }
