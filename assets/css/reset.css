@@ -22,7 +22,7 @@ time, mark, audio, video {
 	font: inherit;
 	vertical-align: baseline;
 }
-a{text-decoration:none; color:inherit; cursor:pointer;}
+a{color:inherit; cursor:pointer;}
 body {
 	line-height: 1;
 }
