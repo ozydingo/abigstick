@@ -14,14 +14,18 @@
 .head-image {
   border-radius: 15px;
   background-image: url("/assets/images/bigstick-dark.jpg");
-  background-size: cover;
+  background-size: 110%;
   background-position: center top;
 }
 
 .header-banner {
   height: 100%;
+  // width: 90%;
+  z-index: 1;
   // background-color: #141824;
-  backdrop-filter: blur(9px) brightness(60%);
+  background: linear-gradient(#100804ff 0%, #100804cc 50%, #10080400 100%);
+  backdrop-filter: blur(10px) brightness(60%);
+  background-color: none;
   padding: 1rem;
   box-sizing: border-box;
   min-height: $spacing-unit * 1.865;
@@ -46,7 +50,7 @@
 
 .head-content {
   height: 100%;
-  width: 75%;
+  width: 70%;
   padding: 1rem;
   box-sizing: border-box;
   display: flex;
