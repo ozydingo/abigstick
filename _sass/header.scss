@@ -1,34 +1,16 @@
 .site-header {
   position: sticky;
-  height: 320px;
-  top: calc(5rem - 300px);
+  top: calc(4rem - 200px);
   width: 100%;
-}
-
-.headspace {
-  height: 1rem;
-  width: 100%;
-  // backdrop-filter: blur(3px) brightness(90%);
-}
-
-.head-image {
-  border-radius: 15px;
-  background-image: url("/assets/images/bigstick-dark.jpg");
-  background-size: 110%;
-  background-position: center top;
 }
 
 .header-banner {
-  height: 100%;
-  // width: 90%;
   z-index: 1;
-  // background-color: #141824;
   background: linear-gradient(#100804ff 0%, #100804cc 50%, #10080400 100%);
   backdrop-filter: blur(10px) brightness(60%);
   background-color: none;
   padding: 1rem;
   box-sizing: border-box;
-  min-height: $spacing-unit * 1.865;
   display: flex;
   justify-content: center;
   box-shadow: 2px 3px 5px 0px rgba(0,0,0,0.4);
@@ -49,9 +31,17 @@
   }
 }
 
+.head-image {
+  border-radius: 15px;
+  background-image: url("/assets/images/bigstick-dark.jpg");
+  background-size: 110%;
+  background-position: center 30%;
+}
+
 .head-content {
-  height: 100%;
   width: 70%;
+  height: 200px;
+  // min-height: 20vw;
   padding: 1rem;
   box-sizing: border-box;
   display: flex;
@@ -61,7 +51,7 @@
 }
 
 .title-content {
-  height: 100%;
+  // height: 100%;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
