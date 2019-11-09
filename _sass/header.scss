@@ -1,6 +1,6 @@
 .site-header {
   position: sticky;
-  top: calc(4rem - 200px);
+  top: calc(4rem - 30vw);
   width: 100%;
 }
 
@@ -36,12 +36,13 @@
   background-image: url("/assets/images/bigstick-dark.jpg");
   background-size: 110%;
   background-position: center 30%;
+  background-repeat: no-repeat;
+  background-color: black;
 }
 
 .head-content {
   width: 70%;
-  height: 200px;
-  // min-height: 20vw;
+  height: 30vw;
   padding: 1rem;
   box-sizing: border-box;
   display: flex;
@@ -71,4 +72,13 @@
   letter-spacing: 2px;
   margin-bottom: 0;
   width: fit-content;
+}
+
+@media all and (max-width: 600px) {
+  .site-header {
+    top: calc(4rem - 180px);
+  }
+  .head-content {
+    height: 180px;
+  }
 }
