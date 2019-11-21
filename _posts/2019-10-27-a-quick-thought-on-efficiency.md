@@ -4,7 +4,7 @@ title: "A quick thought on efficiency"
 description: "A relatable thought experiment on log search efficiency"
 date: 2019-10-27 09:31:00 -0400
 comments: true
-tags: [algorithms]
+tags: [algorithms, performance]
 ---
 
 Avoid premature optimization.
