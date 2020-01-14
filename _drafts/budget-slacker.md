@@ -38,3 +38,23 @@ Slack is a perfect place to put data entry. It's on my phone. It's on my wife's 
 Two taps on my phone gives me a data entry prompt. This is a low enough barrier that we'll actually be able to do it reliably, tracking expenses as we spend them.
 
 At this point, why not use a more structured database for data storage? As I've mentioned above, spreadsheets gives us all the functionality we need once the data are in. I don't have to build a query interface for my wife to use. We can review and correct data right out of the gate. For budgeting to be useful to us, we want the data in a spreadsheet. Integrating the data entry to Slack is the only missing piece, so that's what we're going to build.
+
+## The architecture
+
+Requirements for this project include:
+
+* Log expenses from Slack
+* View current budget summary from Slack
+* View and modify data in Google Sheets
+
+As we've done [before]() and [since](), we'll use serverless functions (specifically, here, Google Cloud Functions) as the immediate layer between Slack and any of our application internals. I'll stick with a Node.js runtime since we'll be making multiple parallelisms and the syntax for doing so in Javascript is really quite lovely.
+
+Because I can't resist, we're also going to include the following features not strictly required for MVP
+
+* Authentication to a unique Google account for different workspaces
+
+I'm doing this not only because I'm stubborn, but also because it requires a whole different authentication scheme compared to using the same account that the Google Function is deployed on, and that just feels like the kind of structure that's nicer to get in ahead of time (we'll see just how true that is as we proceed). We'll store user and workspace data in Google Firestore as an easy start, but any reasonable persistence layer would do.
+
+The one problem we'll run into is that the Google Sheets API library is actually rather slow. Too slow, in fact, for Slack's demands of a 3 second timeout. This is almost entirely in the authentication. So in fact we cannot wait for the Google Sheets operations to complete before completing our response to Slack. Instead, we'll have to give an immediate response and trigger a background task to actually insert or fetch data from the spreadhseet.
+
+The delay between data entry and final confirmation is a bit of a UX impediment and again made me consider using a SQL database for the financial data instead. As I mentioned above, however, a top requirement is the ability to review and edit data directly in the spreadsheet, because I'm not going to build out a CRUD interface that gives the richness of experience that Google Sheets already provides and that my wife will use. A possible compromise would be to have one-off "export to Spreadsheet" functions, but again we're stuck with data editing. No, We'll stick with using the spreadsheet as the single data store.
