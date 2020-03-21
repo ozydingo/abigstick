@@ -186,7 +186,9 @@ async function addExpense(body) {
 }
 ```
 
-The return values in  `reportSpend` and `addExpense` are seen as responses in Slack. We're taking a "trust but verify" approach here to make the response snappy, assuming that most usage of this function will in fact be legit. We'll verify on the other side of the SubSub bridge in the `handle_pubsub_message` function.
+Both `reportSpend` and `addExpense` parse the request data and put a structured message onto PubSub using the `publishEvent` function we just defined. They then return a string message that gets passed back to Slack by the `main` function. `addExpense` uses `parseSpend`, which enforces a pretty strict syntax. Because that's easier for now.
+
+We're taking a "trust but verify" approach here to make the response snappy, assuming that most usage of this function will in fact be legit. We'll verify on the other side of the SubSub bridge in the `handle_pubsub_message` function.
 
 ## Deliverable 1: a working Slack app
 
@@ -205,3 +207,321 @@ I won't go into depth, but here's a checklist:
 Seven small steps, and your app is up and running.
 
 ### handle_pubsub_message
+
+Later in this post we'll discuss deploying the PubSub topic using Deployments Manager. But if you're actuallly following along, just [spin one up](https://cloud.google.com/pubsub/docs/quickstarts) in the console  for now. You just need to give it a name.
+
+This function will be triggered by the messages that `handle_slack_command` puts onto this PubSub topic. In the main entry point function, we'll [verify the message authenticity](https://api.slack.com/docs/verifying-requests-from-slack), then decode the PubSub message and act accordingly.
+
+```js
+async function main(pubSubEvent) {
+  const rawdata = pubSubEvent.data;
+  const message = JSON.parse(Buffer.from(pubSubEvent.data, "base64").toString());
+  console.log("Got message:", message);
+  const { token, action, data, response_url } = message;
+
+  const appToken = await slackTokenPromise;
+  if (token !== appToken) {
+    console.log("Incorrect app token:", token);
+    return;
+  }
+
+  await router(
+    { action, data, response_url }
+  ).then(response => {
+    console.log("Response:", response);
+  }).catch(err => {
+    console.error("ERROOR:", err.message);
+    messageSlack({response_url, text: "Oh no! Something went wrong."});
+  });
+}
+
+module.exports = { main };
+```
+
+Pretty simple entry point, leaving any interpretation beyond the Slack token to the `router` function. Before we get into that, let's look at the dependencies we're alrleady using here.
+
+First, there's `slackTokenPromise`.
+
+```js
+const { getSecret } = require("./getSecret");
+const slackTokenPromise = getSecret(process.env.slackTokenSecret);
+```
+
+And in getSecret.js
+
+```js
+const { SecretManagerServiceClient } = require("@google-cloud/secret-manager");
+
+async function getSecret(versionString) {
+  const secretsClient = new SecretManagerServiceClient();
+  const secretData = await secretsClient.accessSecretVersion({
+    name: versionString
+  });
+  const secret = secretData[0].payload.data.toString("utf8");
+  return secret;
+}
+
+module.exports = {
+  getSecret,
+};
+```
+
+Nothing revolutionary here, just straight from the docs usage of `@google-cloud/secret-manager`. Make sure to `npm install` it or manually add it to you your `package.json`. For this to work, you'll need to provide the environment variable value `slackTokenSecret`. This will be the name of a [secret](https://cloud.google.com/secret-manager/docs) that contains the [Slack verification token](https://api.slack.com/events-api#url_verification) you can get from the Slack app you created. I'll place more detailed instructions for these in the appendix that I keep in my brain and never write down.
+
+Next, we saw  the `main` function use a functioncalled `messageSlack`. This function will be the way we respond to Slack after the initial [acknowledgment response](https://api.slack.com/interactivity/handling#acknowledgment_response) provided by `handle_slack_command`, and relies on the Slack-provided [response URL](https://api.slack.com/interactivity/handling#message_responses).
+
+
+```js
+const axios = require("axios");
+
+function messageSlack({response_url, data}) {
+  return axios({
+    method: "POST",
+    url: response_url,
+    data,
+  });
+}
+```
+
+Standard stuff.
+
+Now we can move on and look at the `router` function.
+
+```js
+async function router({ action, data, response_url }) {
+  const teamInfo = await getTeamInfo(data.team_id);
+
+  if (!haveValidTokens(teamInfo)) {
+    return handleInvalidOauth({response_url, team_id: data.team_id});
+  } else if (!haveValidSpreadsheet(teamInfo)) {
+    return handlleInvalidSpreadsheet({response_url});
+  }
+
+  if (action === "report") {
+    return handleReport({response_url, teamInfo});
+  } else if (action === "spend") {
+    return handleExpense({response_url, teamInfo, expense: data});
+  } else {
+    return Promise.reject("Unrecognized action " + action);
+  }
+}
+```
+
+Some more stuff is going on here; this is the main passage for all actual request processing before branching out into the individual functions.
+
+* First, we get the team metadata from Firebase database, keyed by `team_id` that we can get straight from the Slack request data.
+* We check if we have valid oauth tokens for this team. If not, we need to request them from the user.
+* We check if we have a valid spreadsheet exists for this team. If it does nont, we need to create it.
+* Finally, we branch on the `action` field and call a sub function that handles the appropraite logic.
+
+Progressing systematically, let's look at `getTeamInfo`, `haveValidTokens`, `handleInvalidOauth`, and `handleInvalidSpreadsheet`.
+
+```js
+const { invokeFunction } = require("./invoke_function.js");
+
+function getTeamInfo(team_id) {
+  return invokeFunction(process.env.teamsUrl, {action: "get", team_id});
+}
+```
+
+Well that's not very informative. What does `invoke_funuction.js` look like?
+
+It's a bit longer than I'd like but it's another stright-from-the-docs method to invoke a non-pubilc Google Cloud function. That last part is important: the function hosted at `teamsUrl` is how we're going to retrieve stored oauth tokens, we have to make sure it's not publicly accessible. To invoke a non-public function from another function, you need to fetch an invocation token and send that token to the target function in your request headers.
+
+```js
+const axios = require("axios");
+
+const metadataServerTokenUrlBase = "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity?audience=";
+
+function getInvocationToken(functionUrl) {
+  const metadataUrl = metadataServerTokenUrlBase + encodeURIComponent(functionUrl);
+  return axios({
+    method: "GET",
+    url: metadataUrl,
+    headers: {
+      "Metadata-Flavor": "Google"
+    }
+  }).then(response => response.data);
+}
+
+async function invokeFunction(url, data){
+  const token = await getInvocationToken(url);
+  const headers = {
+    Authorization: `bearer ${token}`,
+    "Content-type": "application/json",
+  };
+  const response = await axios({
+    method: "POST",
+    url,
+    headers,
+    data,
+  });
+  return response.data;
+}
+
+module.exports = {
+  invokeFunction,
+};
+```
+
+Great! Now we have the code needed to invoke one of our cloud functions from another. We'll make heavy use of this going forward. For now, let's move on to the other functions we used in `handle_pubsub_message`. Two of them, `haveValidTokens` and `haveValidSpreadsheet`, are basically MVP punts for more thorough token and resource validation, just checking that the information to find them exists.
+
+```js
+function haveValidTokens(teamInfo) {
+  return teamInfo && teamInfo.tokens;
+}
+
+function haveValidSpreadsheet(teamInfo) {
+  return teamInfo && teamInfo.spreadsheet_id;
+}
+```
+
+That'll do for now. Now for the handlers. How do we handle invalid or missing oauth  tokens or spreadsheets? Let's do the easy one first:
+
+```js
+function handlleInvalidSpreadsheet({response_url}) {
+  return messageSlack({response_url, data: responses.invalidSpreadsheetMessage});
+}
+```
+
+Where `invalidSpreadsheetMessage` is just the following:
+
+```js
+function invalidSpreadsheetMessage() {
+  return "Uh oh! I can't find your budget spreadsheet. Please contact support.";
+}
+```
+
+Yeah. Punt.
+
+Ok, but oauth? That one's real.
+
+```js
+function handleInvalidOauth({response_url, team_id}) {
+  const oauthUrl = `${process.env.requestOauthUrl}?team_id=${encodeURIComponent(team_id)}`;
+  const oauthMessage = responses.requestOauthBlocks({oauthUrl});
+  return messageSlack({response_url, data: oauthMessage});
+}
+```
+
+Here, we need to [enable and authorize the Google Sheets API](https://developers.google.com/sheets/api/guides/authorizing). Following the instructions there to create an app and attached credentials, we get a Google URL where we can send users to to authenticate and grant us permissions. We then respond to Slack with an interactive component that contains a button that allows the user to navigate to this URL.
+
+```js
+function requestOauthBlocks({ oauthUrl }) {
+  return {
+    blocks: [
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: "To start using Budget Slacker, you'll need to grant authorization to use Google Sheets.",
+        }
+      },
+      {
+        type: "actions",
+        block_id: "oauth-access",
+        elements: [
+          {
+            type: "button",
+            value: "grant",
+            style: "primary",
+            text: {
+              type: "plain_text",
+              text: "Grant",
+            },
+            url: oauthUrl,
+          },
+          {
+            type: "button",
+            value: "cancel",
+            text: {
+              type: "plain_text",
+              text: "Cancel",
+            },
+          },
+        ]
+      }
+    ]
+  };
+}
+```
+
+That creates a response that looks like this:
+
+{% include post_image.html class="padded-image" name="oauth-request.png" width="500px" alt="Oauth dialog with 'Grant' and 'Cancel' buttons" title="Oauth Request"%}
+
+When the user clicks on "Grant", they'll be taken to `requestOauthUrl`.
+
+Ok, two more pieces.
+
+```js
+async function handleReport({response_url, teamInfo}) {
+  const { spreadsheet_id, tokens } = teamInfo;
+  const app_credentials = await credentialsPromise;
+  const totals = await invokeFunction(
+    process.env.getTotalsUrl,
+    {app_credentials, spreadsheet_id, tokens}
+  );
+  const message = responses.reportTotals({totals});
+  return messageSlack({response_url, data: message});
+}
+```
+
+This just keeps going, doesn't it? Don't worry, we're crossing a threshold. We've seen all these pieces before: `credentialsPromise`, `invokeFunction`, and `messageSlack`. We haven't looked at the `teams` function yet, but as you can infer here it returns the spreadsheet id and oauth tokens required for access for the current team. We use those credentials to read that team's spreadsheet in the function at `getTotalsUrl`, which  we'll see in a bit. Lastly, we reply to Slack with
+
+```js
+function reportTotals({totals}) {
+  if (totals.length === 0) { return "You haven't spend anything this month yet!"; }
+  totals.sort((a, b) => (b.values[0] - a.values[0]));
+  let text = "What you've spent so far this month:\n";
+  text += totals.filter(item => (
+    item.values[0] > 0
+  )).map(item => {
+    return `${item.category}: $${item.values[0]}`;
+  }).join("\n");
+  return {text};
+}
+```
+
+The `totals` data comes from the response of the function at `getTotalsUrl`, and contains objects with the structure `{category, values}`, where `values` is an array containing the last few months of totals in that category. Right now, we're only using the current month, hence the `[0]` index.
+
+Ok, and the *final* peice of `handle_pubsub_message`, `handleExpense`. In this function, we'll add the requested expense to the spreadsheet and tell the user how much they've spent on that category so far this month. To do the latter, we'll actually first fetch the current totals and add the current expense to it right here rather than in the spreadsheet, because we don't know how long it takes for the spreadsheet formula that computes the totals to update after our request to add a new row completes. Then we'll add the expense row to the spreadsheet and respond to Slack in parallel using `Promise.all`.
+
+```js
+async function handleExpense({response_url, teamInfo, expense}) {
+  const { spreadsheet_id, tokens } = teamInfo;
+  const app_credentials = await credentialsPromise;
+  const totals = await invokeFunction(
+    process.env.getTotalsUrl,
+    {app_credentials, spreadsheet_id, tokens}
+  );
+  const message = responses.confirmExpense({totals, expense});
+  return Promise.all([
+    invokeFunction(
+      process.env.addExpenseUrl,
+      {
+        app_credentials,
+        expense,
+        spreadsheet_id,
+        tokens,
+      }
+    ),
+    messageSlack({response_url, data: message}),
+  ]);
+}
+```
+
+`confirmExpense`, as discussed above, adds the current expense to the fetched totals (noting that we're using case-insensitive matching on the category names).
+
+```js
+function confirmExpense({totals, expense}) {
+  const { amount, category } = expense;
+  const totalForCategory = totals.find(item => item.category.toLowerCase() === category.toLowerCase());
+  const previousTotal = totalForCategory && Number(totalForCategory.values[0]) || 0;
+  const total = previousTotal + Number(amount);
+  const text = `You've spent $${total} so far this month on ${category}`;
+  return {text};
+}
+```
+
+Phew, we're done with `handle_pubsub_message`. That was really the crux of all of our business logic. The rest of the functions are pretty straightforward endpoints to read and write data.
