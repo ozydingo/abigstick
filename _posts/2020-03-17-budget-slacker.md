@@ -309,7 +309,7 @@ async function router({ action, data, response_url }) {
 
 Some more stuff is going on here; this is the main passage for all actual request processing before branching out into the individual functions.
 
-* First, we get the team metadata from Firebase database, keyed by `team_id` that we can get straight from the Slack request data.
+* First, we get the team metadata from Firestore database, keyed by `team_id` that we can get straight from the Slack request data.
 * We check if we have valid oauth tokens for this team. If not, we need to request them from the user.
 * We check if we have a valid spreadsheet exists for this team. If it does nont, we need to create it.
 * Finally, we branch on the `action` field and call a sub function that handles the appropraite logic.
@@ -624,7 +624,7 @@ Let's briefly walk through our custom logic here.
   * `serviceAccount:{{ env['project'] }}@appspot.gserviceaccount.com`. This construction represents the default [service account](https://cloud.google.com/iam/docs/service-accounts) that other Google Cloud Functions will be using. That is, this member binding allows other Google Cloud functions in the same project to invoke this function.
 * Lastly, if the function is an https trigger, we declare an output named `url` to allow the configuration using this template to print this URL out.
 
-The `pubsub_topic.jinja` is relatively much more straightfoward. It's just a PubSub topic with a name.
+The `pubsub_topic.jinja` is relatively much more straightforward. It's just a PubSub topic with a name.
 
 {% raw %}
 ```yml
@@ -718,4 +718,511 @@ outputs:
   value: $(ref.handle-slack-interaction.url)
 ```
 
-Digest that in your own time, but at a high level this configuration is a PubSub topic and a bunch of functions (with IAM roles) as defined by `budget_slacker_function.jinja`. Each function has settings for public vs authenticated, https or pubsub trigger, code location, and any environment variables that the function will need (such as other function URLs, secrets names, or the name of the PubSub topic).
+Look, digest that in your own time, but at a high level this configuration is a PubSub topic and a bunch of functions (with IAM roles) as defined by `budget_slacker_function.jinja`. Each function has settings for public vs authenticated, https or pubsub trigger, code location, and any environment variables that the function will need (such as other function URLs, secrets names, or the name of the PubSub topic).
+
+## Oauth
+
+Alright, look, I know you're getting tired, right, but we can't take the easy way out. We haefv to deal with Oauth before we can dive into the endpoints that read and write from the spreadsheets.
+
+A basic Oauth workflow is to send the user to an authentication page at the identity provider (here, Google). After logging in and verifying the granted permissions ("scopes"), the identity provider redirects the user to a URL you have set up with a code. To verify that this request is legit, your server (excuse, me, serverless function) send this code back to the identity provider in exchange for authentication tokens that you can subsequently use to make authenticated calls to the service.
+
+So we have two functions: `request_oauth` and `store_oauth`, repsenting either side of this transaction.
+
+In `requesut_oauth`, we:
+
+* Retrieve the secret that tells Google we are the application we way we are.
+* Make a request to Google's authentication URL with the secret and some "state" information that Google will keep attached to this request.
+  * Here, we need the team id to be returned to us when the user authenticates so we know where to store the tokenn.
+* With Google, we have to use their client library to get the authentication URL. This is the `getAuthUrl` function, below. To even do this, we need the app secret, which we've stored in Secrets Manager (see `getSecret`, defined above)
+* We also need to [identify the scopes](https://developers.google.com/identity/protocols/oauth2/scopes) we require. Ideally, this would just be `drive.file` scope, which give our application permission to create files and edit files that we have created. However, we need `drive.readonly` as well because we're going to copy a read-only, [public spreadsheet](https://docs.google.com/spreadsheets/d/1wxB-doRFGIlMRNAn9wTJ9ySyxl5V5M0WOyK0L1MRjsc/edit?usp=sharing) that I've set up to be the initial template that all budget spreadsheets will start with. Without the `drive.readonly` or greater scope, we can't read this file from the app and therefore can't copy it into our own account.
+
+```js
+const { google } = require("googleapis");
+
+const { getSecret } = require("./getSecret");
+
+const SCOPES = [
+  "https://www.googleapis.com/auth/drive.readonly",
+  "https://www.googleapis.com/auth/drive.file"
+];
+const oauthRedirectUri = process.env.storeOauthUrl;
+
+// Do this on function initializaion; it doesn't change.
+const credentialsPromise = getSecret(process.env.appCredentialsSecret);
+
+function getAuthUrl({app_credentials, team_id}) {
+  const {client_secret, client_id} = app_credentials;
+  const oAuth2Client = new google.auth.OAuth2(
+    client_id, client_secret, oauthRedirectUri
+  );
+
+  const authUrl = oAuth2Client.generateAuthUrl({
+    access_type: "offline",
+    scope: SCOPES,
+    prompt: "consent",
+    state: JSON.stringify({team_id}),
+  });
+
+  return authUrl;
+}
+
+function htmlRedirect(url) {
+  return `<html><head><script>window.location.href="${url}";</script></head></html>`;
+}
+
+async function main(req, res) {
+  const { query: { team_id } } = req;
+  const app_credentials = await credentialsPromise;
+  const oauthUrl = getAuthUrl({app_credentials, team_id});
+  res.status(200).send(htmlRedirect(oauthUrl));
+}
+
+module.exports = {
+  main,
+};
+```
+
+So when the user clicks the "Grant" button from the above Slack interactive block, we'll respond with this function, sending them to `oauthUrl` containing the scopes and team_id.
+
+When the user authenticates, we'll get a request to our `storeOauth` function. In this function, we parse the code from the request, exchange it with Google for tokens (for which we again need the app secret), store these tokens in our database (Look, don't give me slack about encryption, you wanna hack my family budget? Go for it.), and, if necessary, create the spreadsheet for the team.
+
+As always, start with `main` and branch out from there.
+
+```js
+const { google } = require("googleapis");
+
+const { getSecret } = require("./getSecret");
+const { invokeFunction } = require("./invoke_function");
+
+// Do this on function initializaion; it doesn't change.
+const credentialsPromise = getSecret(process.env.appCredentialsSecret);
+
+// TODO: get URL from deployment url property instead of constructing it
+const redirect_url = `https://us-east1-budget-slacker.cloudfunctions.net/${process.env.functionName}`;
+
+const clientPromise = credentialsPromise.then(app_credentials => {
+  const {client_secret, client_id} = app_credentials;
+  const client = new google.auth.OAuth2(
+    client_id, client_secret, redirect_url
+  );
+  return client;
+});
+
+async function getToken(code) {
+  console.log("Exchanging code for tokens");
+  const client = await(clientPromise);
+  const token = await client.getToken(code);
+  return token;
+}
+
+async function storeTokens(team_id, tokens) {
+  console.log(`Storing tokens for team ${team_id}`);
+  return invokeFunction(process.env.teamsUrl, {
+    action: "update",
+    team_id,
+    tokens
+  });
+}
+
+async function setupTeam(team_id, tokens) {
+  const app_credentials = await credentialsPromise;
+  return invokeFunction(process.env.setupUrl, {
+    app_credentials,
+    team_id,
+    tokens
+  });
+}
+
+function spreadsheetUrl(spreadsheet_id) {
+  return `https://docs.google.com/spreadsheets/d/${spreadsheet_id}`;
+}
+
+function grantResponse(spreadsheet_id) {
+  return `<html><body>Thanks! You can <a href=${spreadsheetUrl(spreadsheet_id)}>view or edit your budget spreadsheet here</a> at any time. You can now close this window and return to Slack.</body></html>`;
+}
+
+async function main(req, res) {
+  const { code, state } = req.query;
+  console.log("Got oauth code with state",  state);
+  const team_id = JSON.parse(state).team_id;
+  const tokenResponse = await getToken(code).catch(console.error);
+  if (!tokenResponse.tokens) { throw new Error("Unable to get tokens. Response:", tokenResponse); }
+  const { tokens } = tokenResponse;
+
+  const [setupResponse,] = await Promise.all([
+    setupTeam(team_id, tokens),
+    storeTokens(team_id, tokens),
+  ]);
+
+  const { spreadsheet_id } = setupResponse;
+  const message = grantResponse(spreadsheet_id);
+
+  res.set("Content-Type", "text/html");
+  res.status(200).send(message);
+}
+
+module.exports = {
+  main,
+};
+```
+
+This renders in the user's browser, but really we want to direct them back to Slack. I use the Slack desktop app or mobile app, so with browser restrictions I won't be allowed to close the window using javascript, and so the best I'm going to do is give the user and ok message and tell them they can close the window.
+
+One thing you might have noticed was by glaring `TODO` in this function. See, normally, I pass function URLs into other functions using environment variables. Here we have a challenge. We don't need the URL because we're trying to call it, we need it because Google's oauth client requires it as a means of identifying the application request. The problem is, we need the function of *this very function*, `store_oauth`. Google deployment manager can't pass a function's URL into itself, that's a very tight circular  dependency. So, to get around this, I am manually constructing the URL from the pattern that I know Deployment Manager currently uses.
+
+## Setup
+
+We're almost there, I promise.
+
+The last thing we called in `store_oauth` was another function called `setup`. This function is responsible for setting up a team's metainfo and spreadsheet. If we already have the spreadsheet, we'll just return the id. Otherwise, we'll call the `spreadsheets` function with `action=create` to copy a new one from the template I mentioned above.
+
+```js
+const { invokeFunction } = require("./invoke_function");
+
+function getTeam(team_id) {
+  return invokeFunction(
+    process.env.teamsUrl, {
+      action: "get",
+      team_id,
+    }
+  );
+}
+
+function createSpreadsheet({ app_credentials, tokens }) {
+  return invokeFunction(
+    process.env.spreadsheetsUrl, {
+      action: "create",
+      app_credentials,
+      tokens
+    },
+  ).then(({ spreadsheet_id }) => spreadsheet_id);
+}
+
+async function main(req, res) {
+  const { app_credentials, team_id, tokens } = req.body;
+  const team = await getTeam(team_id);
+
+  let spreadsheet_id;
+  if (team.spreadsheet_id) {
+    spreadsheet_id = team.spreadsheet_id;
+  } else {
+    spreadsheet_id = await createSpreadsheet({app_credentials, tokens});
+    console.log("Created spreadsheet", spreadsheet_id);
+    await invokeFunction(
+      process.env.teamsUrl, {
+        action: "update",
+        team_id,
+        spreadsheet_id,
+      }
+    );
+  }
+
+  res.status(200).json({team_id, spreadsheet_id});
+}
+
+module.exports = {
+  main,
+};
+```
+
+## Spreadsheets
+
+Ok, now *I'm* getting tired.
+
+The spreadsheets function will copy the fixed, template spreadhseet, whose id is and always will be `1wxB-doRFGIlMRNAn9wTJ9ySyxl5V5M0WOyK0L1MRjsc`, into the user's now authenticated project. Like before, we need the app secret to make this call. Unlike before, we're going to have these functions that interface with Google Sheets and Firestore require that the caller provide them (remember, these functions are not public). This keeps the app secret logic isolated to the oauth functions for greater separation of concerns. This function focuses only on knowing how to use those credentials to copy the spreadsheet that it knows about.
+
+```js
+const { google } = require("googleapis");
+
+const templateSpreadsheetId = "1wxB-doRFGIlMRNAn9wTJ9ySyxl5V5M0WOyK0L1MRjsc";
+
+function oauthClient({app_credentials, tokens}) {
+  const { client_id, client_secret } = app_credentials;
+
+  const client = new google.auth.OAuth2(
+    client_id,
+    client_secret,
+  );
+  client.setCredentials(tokens);
+
+  return client;
+}
+
+function driveClient({app_credentials, tokens}) {
+  return google.drive({version: "v3", auth: oauthClient({app_credentials, tokens})});
+}
+
+function copyTemplate({app_credentials, tokens}) {
+  const drive = driveClient({app_credentials, tokens});
+  return drive.files.copy({
+    fileId: templateSpreadsheetId,
+    resource: {
+      name: "Budget Slacker"
+    }
+  });
+}
+
+async function create(req, res) {
+  const { app_credentials, tokens } = req.body;
+  const response = await copyTemplate({app_credentials, tokens});
+  const spreadsheet_id = response.data.id;
+  res.status(200).json({spreadsheet_id});
+}
+
+// async function get(req, res) {
+//   const { app_credentials, spreadsheet_id, tokens } = req.body;
+//   client.spreadsheets.get({spreadsheetId: spreadsheet_id});
+// }
+
+async function main(req, res) {
+  const { action } = req.body;
+
+  if (action === "create") {
+    await create(req, res);
+  } else {
+    res.status(400).send("Bad action");
+  }
+}
+
+module.exports = {
+  main
+};
+```
+
+## GetTotals
+
+We've done all the heavy lifting. All that's left is some straightforward client interfaces to our data formats in Google Sheets and Firestore. Like with `spreadsheets`, we'll need oauth credentials but will require the caller to provide them in the request.
+
+```js
+const { sheetsClient } = require("./sheets_client");
+
+const HISTORY = 6;
+
+function parseDollars(value) {
+  if (!value) { return 0; }
+  return Number(value.replace("$", ""));
+}
+
+async function getTotals({sheets, spreadsheet_id}) {
+  const result = await sheets.spreadsheets.values.get({
+    spreadsheetId: spreadsheet_id,
+    range: `Categories!B1:ZZ${HISTORY+1}`,
+    majorDimension: "COLUMNS",
+  });
+  if (!result.data.values) { return []; }
+  const totals = result.data.values.map(array => ({
+    category: array[0],
+    values: array.slice(1).map(value => parseDollars(value)),
+  }));
+  return totals;
+}
+
+async function main(req, res) {
+  const { app_credentials, tokens, spreadsheet_id } = req.body;
+  const sheets = sheetsClient({app_credentials, tokens});
+  const totals = await getTotals({sheets, spreadsheet_id});
+  res.status(200).send(JSON.stringify(totals));
+}
+
+module.exports = {
+  main
+};
+```
+
+Check out the [template spreadsheet](https://docs.google.com/spreadsheets/d/1wxB-doRFGIlMRNAn9wTJ9ySyxl5V5M0WOyK0L1MRjsc/edit?usp=sharing) to convince youurself of the ranges and math being used, but we're just pulling data directly from the `Categories` sheet that contains monthly totals, parsing them a bit for a nice json return, and sending the data back.
+
+The `sheetsClient` file just allows us to abstract away the specific Google driver initializaion details:
+
+```js
+const { google } = require("googleapis");
+
+function sheetsClient({app_credentials, tokens}) {
+  const { client_id, client_secret } = app_credentials;
+
+  const client = new google.auth.OAuth2(
+    client_id,
+    client_secret,
+  );
+  client.setCredentials(tokens);
+
+  const sheets = google.sheets({version: "v4", auth: client});
+  return sheets;
+}
+
+module.exports = {
+  sheetsClient
+};
+```
+
+## AddExpense
+
+Finally, we're at the part that actually gives us the functioality we were after. What, was that too much work?
+
+We have the same sheetsClient as above, and some data parsing and processing to write a new expense item into our spreadsheet as a new row.
+
+```js
+const { sheetsClient } = require("./sheets_client");
+
+const EXPENSE_RANGE = "expenses!A1:F1";
+
+function epochToDatetime(timestamp) {
+  const month = timestamp.getMonth() + 1;
+  const date = timestamp.getDate();
+  const year = timestamp.getFullYear();
+  const hour = timestamp.getHours();
+  const minute = timestamp.getMinutes();
+  const second =  timestamp.getSeconds();
+  return  `${month}/${date}/${year} ${hour}:${minute}:${second}`;
+}
+
+function dataRow(expense) {
+  const time = new Date(expense.timestamp);
+  const values = [
+    epochToDatetime(time),
+    expense.user_id,
+    expense.user_name,
+    expense.amount,
+    expense.category,
+    expense.note,
+  ];
+  return values;
+}
+
+async function addExpense({sheets, spreadsheet_id, expense}) {
+  const values = dataRow(expense);
+  console.log("Appending row with", values);
+  return sheets.spreadsheets.values.append({
+    spreadsheetId: spreadsheet_id,
+    range: EXPENSE_RANGE,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [values] },
+  });
+}
+
+async function main(req, res) {
+  const { app_credentials, tokens, spreadsheet_id, expense } = req.body;
+  const sheets = sheetsClient({app_credentials, tokens});
+  await addExpense({sheets, spreadsheet_id, expense});
+  res.status(200).send({ok: true});
+}
+
+module.exports = {
+  main
+};
+```
+
+## Teams
+
+There's one more meaningful function we have thus far omited. `teams` interfaces with the team metadata storage in Firestore. It's a pretty simply CRUD (without the D) interface to the Firestore documents. We've just split it into `index.js`, which defines handles valid requests, and `teams.js`, that encapsulates the Firestore-specific logic
+
+```js
+const teams = require("./teams");
+
+async function get(req, res) {
+  const { team_id } = req.body;
+  const team = await teams.find(team_id);
+  const data = team ? team.data() : null;
+  res.status(200).json(data);
+}
+
+async function update(req, res) {
+  const { team_id, tokens, spreadsheet_id } = req.body;
+  await teams.update(team_id, {tokens, spreadsheet_id});
+  res.status(200).json({ok: true});
+}
+
+async function main(req, res) {
+  const { action } = req.body;
+
+  if (action === "get") {
+    await get(req, res);
+  } else if (action === "update") {
+    await update(req, res);
+  } else {
+    res.status(400).send("Unknown action");
+  }
+}
+
+module.exports = {
+  main
+};
+```
+
+And `teams.js`:
+
+```js
+const Firestore = require("@google-cloud/firestore");
+
+const COLLECTION_NAME = "teams";
+const PROJECT_ID = process.env.GCP_PROJECT;
+
+const firestore = new Firestore({
+  projectId: PROJECT_ID,
+});
+const collection = firestore.collection(COLLECTION_NAME);
+
+async function find(team_id) {
+  const result = await collection.where(
+    "team_id", "==", String(team_id)
+  ).limit(1).get();
+  return result.docs[0];
+}
+
+async function find_or_create(team_id, attrs = {}) {
+  const team = await find(team_id);
+  if (team) { return team; }
+
+  const ref = await collection.add({
+    team_id: team_id,
+    ...attrs,
+  });
+  const newUser = await ref.get();
+  return newUser;
+}
+
+async function update(team_id, attrs) {
+  const team = await(find_or_create(team_id));
+  return collection.doc(team.id).update(safe_attrs(attrs));
+}
+
+function safe_attrs(attrs) {
+  const return_attrs = {};
+  if (attrs.tokens !== undefined) { return_attrs.tokens = attrs.tokens; }
+  if (attrs.spreadsheet_id !== undefined) { return_attrs.spreadsheet_id = attrs.spreadsheet_id; }
+  return return_attrs;
+}
+
+module.exports = {
+  find,
+  find_or_create,
+  update,
+};
+```
+
+## HandleSlackInteraction
+
+Ok I've saved the best for last. Remember the oauth prompt we sent to the user in Slack? Well even though the only behavior we actually wanted was the URL redirect from the "Grant" button, Slack will still insist on pinging a URL for all interactive components. So we'll just put up a simple function that does nothing and gives a 200 OK response.
+
+```js
+function main(req, res) {
+  const { body } = req;
+  const payload = body.payload ? JSON.parse(body.payload) : null;
+  console.log("Got payload:", payload);
+
+  res.status(200).send("✔");
+}
+
+module.exports = {
+  main,
+};
+```
+
+## Wrapping up
+
+There you have it, a fully functioning budgeting app that ties Slack and Google Sheets together. You read all that, right?
+
+If we want to be thorough (and clearly we do), we need to go into a bit of detail on how to get this code in a Google Source Repository, how to deploy this stack using that repository, how to set up the Oauth application client with secrets and redirect URLs, and, of course, how to set up the Slack app to make the right requests to our pubic function.s
+
+## Deploying
+
+## Setting up the Oauth Client
