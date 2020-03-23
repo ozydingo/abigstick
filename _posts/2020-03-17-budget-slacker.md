@@ -73,15 +73,33 @@ Since we're already using Google Cloud functions, we may as well use other Googl
 * We'll store metadata, such as the spreadsheet id and authorization tokens, in a [Firestore](https://cloud.google.com/firestore) database. (Having the user authorize per request is -- just no)
 * At this point, we're managing several moving parts, so we'll use use [Google Cloud Deployment Manager](https://cloud.google.com/deployment-manager) to keep it all organized.
 
-All told, the architecture looks like this.
+So we're going to build something like this:
 
 {% include post_image.html class="padded-image" name="architecture.png" width="500px" alt="Budget Slacker architecture" title="Architecture"%}
 
 <small>Yes, we could use a separate PubSub topic for each interaction type withing Slack instead of a single message bus. But I don't wanna, ok? Besides, there's a fair bit of shared code to verify the message's authenticity, retrieve the authentication credentials, and authenticate Google Sheets clients, so let's just do that part once.</small>
 
+## The pieces
+
+Let's dive a little deeper into what component functions we're going to build to make this happen. Specifically, let's carve out what that  clump of functions after the PubSub queue looks like. The `handle-pubsub-message` function will parse the command and call one of the following pathways:
+
+* `add-expense`: Add a row to our spreadsheet and report the totals for the added category
+* `get-totals`: Fetch this month's category totals
+* `request-oauth`: Direct the user to authenticate our application in their Google Drive accuont.
+
+To start, let's ignore the oauth path. You can manually obtain tokens for yourself by following the [Google Sheets authorization guide](https://developers.google.com/sheets/api/guides/authorizing). Without this branch, the  architecture remains quite simple.
+
+{% include post_image.html class="padded-image" name="architecture-no-oauth.png" width="500px" alt="Budget Slacker architecture" title="Architecture"%}
+
+We'll build this architecture first, but don't you dare get complacent, we're eventually headed here:
+
+{% include post_image.html class="padded-image" name="architecture-full.png" width="700px" alt="Budget Slacker architecture" title="Architecture"%}
+
 ## The Code
 
-Let's peek at the future and look at the project's organization.
+To peek at where we're headed, you can see the [full repo](https://github.com/ozydingo/budget-slacker/issues) on Github.
+
+Just for now, let's quickly look at the project's organization.
 
 ```
 .
@@ -102,15 +120,13 @@ Let's peek at the future and look at the project's organization.
     └── pubsub_topic.jinja
 ```
 
-You can see the [full repo](https://github.com/ozydingo/budget-slacker/issues) on Github.
-
-Simple enough. Our deployment templates are in a `templates` folder, and the functions we need are in `functions`. Each of these functions will usue Node.js.
+Simple enough. Our deployment templates are in a `templates` folder, and the functions we need are in `functions`. Each of these functions will use Node.js.
 
 Let's dive into the first function in our data flow, `handle_slack_command`.
 
 ### handle_slack_command
 
-Since we're doing heavy lifting asynchronously, let's keep this one as light as possible. Receive a message, publish to PubuSub, respond to Slack. That's it. So we need only `@google-cloud/pubsub` in our dependencies. If you're setting this up from scratch: `npm init` then `npm install "@google-cloud/pubsub"` in the `handle_slack_command` folder, then verify that the created `package.json` file contains the following:
+Because of our PubSub architecture, we'll keep this function as light as possible. Receive a message, publish to PubuSub, respond to Slack. That's it. For this we need only `@google-cloud/pubsub` in our dependencies. If you're setting this up from scratch: `npm init` then `npm install "@google-cloud/pubsub"` in the `handle_slack_command` folder, then verify that the created `package.json` file contains the following:
 
 ```json
 "dependencies": {
@@ -120,7 +136,7 @@ Since we're doing heavy lifting asynchronously, let's keep this one as light as 
 
 Google Cloud Functions will use this `package.json` file to install the same dependencies on the server running the serverless code. (I just like saying that.)
 
-Now for the function itself. It needs to parse the command and do something with the result. Easy:
+Now for the function itself. The entry point is a simple control router:
 
 ```js
 exports.main = async (req, res) => {
@@ -155,7 +171,18 @@ async function publishEvent(data) {
 
 `process.env.GCP_PROJECT` is given to us for free, but we'll have to set up the environment variable `process.env.pubsub_topic`, the string name of the PubSub topic. Hardwire it if you like, but we'll set this up in the Deployment Manager template.
 
-Here's the rest of `handle_slack_command`:
+`reportSpend` is the easier of the two functions, since there's no data to parse. It simply pushes the message onto the PubSub topic  using the `publishEvent` function we just defined.
+
+```js
+async function reportSpend(body) {
+  const { token, response_url, team_id } = body;
+  const data = { team_id };
+  await publishEvent({ token, action: "report", response_url, data });
+  return "Crunching the numbers, hang tight!";
+}
+```
+
+We want to do a tiny bit more with `addExpense`, because, for best user experience, we can and should respond immediately if the request syntax was incorrect. So we'll parse the message, extract the structured data, and push that onto the PubSub topic. If we can't extract the structured data, we'll respond to Slack immediately. Note that the return value of both  `addExpense` and  `reportSpend` are sent back to Slack via the `res.send` function in `main`.
 
 ```js
 const SPEND_PATTERN = /\$?(\d+(?:\.\d{1,2})?)\s+(?:on\s+)?(.+?)(?:\s*:\s*(.*))$/;
@@ -165,13 +192,6 @@ function parseSpend(text) {
   if (!match) { return {ok: false}; }
   const [, amount, category, note] = match;
   return {ok: true, expense: {amount, category, note}};
-}
-
-async function reportSpend(body) {
-  const { token, response_url, team_id } = body;
-  const data = { team_id };
-  await publishEvent({ token, action: "report", response_url, data });
-  return "Crunching the numbers, hang tight!";
 }
 
 async function addExpense(body) {
@@ -186,15 +206,13 @@ async function addExpense(body) {
 }
 ```
 
-Both `reportSpend` and `addExpense` parse the request data and put a structured message onto PubSub using the `publishEvent` function we just defined. They then return a string message that gets passed back to Slack by the `main` function. `addExpense` uses `parseSpend`, which enforces a pretty strict syntax. Because that's easier for now.
-
-We're taking a "trust but verify" approach here to make the response snappy, assuming that most usage of this function will in fact be legit. We'll verify on the other side of the SubSub bridge in the `handle_pubsub_message` function.
+As a final note on this function, we're taking a "trust but verify" approach here. That is: we're optimizing for the legitimate use case to make the response snappy even though it might mean adding a little extra load on our PubSub queue prior to verifying that our Slack app is the one that sent us the message. Given the extreme motivation for hackers to bombard my app with phony requests, this is clearly a poor decision.
 
 ## Deliverable 1: a working Slack app
 
 Before we get into the other functions, we can pause here and do a small amount of work to have a deliverable product: a working Slack app that accepts these commands and logs them, but doesn't actually do anything with them. Look we're being agile.
 
-I won't go into depth, but here's a checklist:
+In short, you need to deploy the function and create a Slack app that sends requests to it. To do these two steps, here's a checklist that I won't go into depth on:
 
 * Create a [Google Cloud Function](https://cloud.google.com/functions#documentation), making sure it has an HTTP trigger and allows unauthenticated invocations. (Slack needs to be able to call it!)
 * Leave the source as "inline editor" and select "Node.js" as the runtime. I'm still using 8 for this, but 10 should work fine even though it's in beta (for GCP) at the time of this writing.
@@ -206,9 +224,11 @@ I won't go into depth, but here's a checklist:
 
 Seven small steps, and your app is up and running.
 
+{% include post_image.html class="padded-image" name="pie.png" width="300px" alt="Budget Slacker architecture" title="Architecture"%}
+
 ### handle_pubsub_message
 
-Later in this post we'll discuss deploying the PubSub topic using Deployments Manager. But if you're actuallly following along, just [spin one up](https://cloud.google.com/pubsub/docs/quickstarts) in the console  for now. You just need to give it a name.
+Later in this post we'll discuss deploying the PubSub topic using Deployments Manager. But if you're actually following along, just [spin one up](https://cloud.google.com/pubsub/docs/quickstarts) in the console  for now. You just need to give it a name.
 
 This function will be triggered by the messages that `handle_slack_command` puts onto this PubSub topic. In the main entry point function, we'll [verify the message authenticity](https://api.slack.com/docs/verifying-requests-from-slack), then decode the PubSub message and act accordingly.
 
