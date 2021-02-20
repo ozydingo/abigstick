@@ -1,13 +1,57 @@
 /**
+ * Code formatting
+ */
+pre,
+code {
+  @include relative-font-size(0.9375);
+  border: 1px solid $grey-color-light;
+  border-radius: 4px;
+  background-color: #f2f2f8;
+  border: 1px solid #e2e2e8;
+  color: #002;
+}
+
+code {
+  padding: 1px 5px;
+}
+
+pre {
+  padding: 8px 12px;
+  overflow-x: auto;
+
+  > code {
+    border: 0;
+    padding-right: 0;
+    padding-left: 0;
+  }
+}
+
+/**
  * Syntax highlighting styles
  */
 .highlight {
-  background: #fff;
+  // background: #2227;
   @extend %vertical-rhythm;
+  border-radius: 3px;
+  // text-shadow: 1px 1px 2px #22222212;
 
-  .highlighter-rouge & {
-    background: #eef;
+  div {
   }
+
+  pre {
+    background: #f2f2f8;
+    box-shadow: 1px 2px 3px #7775;
+    border: 1px solid #cccc;
+    background-color: #f2f2f8;
+  }
+
+  code {
+    background-color: transparent;
+  }
+
+  // .highlighter-rouge & {
+  //   background: #eef;
+  // }
 
   .c     { color: #998; font-style: italic } // Comment
   .err   { color: #a61717; background-color: #e3d2d2 } // Error
