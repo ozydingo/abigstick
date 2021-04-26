@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "Wrapping Rake"
-description: "Useful before and after hooks to rake "
+description: "Useful before and after hooks to rake"
 date: 2021-03-21 10:23:00 -0400
 comments: true
 tags: [ruby, rake]
