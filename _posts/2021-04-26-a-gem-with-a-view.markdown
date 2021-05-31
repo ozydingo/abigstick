@@ -13,7 +13,7 @@ This will be a two or three part series (I haven't decided yet). The end goal is
 
 ## Middlewhat?
 
-I won't go into depth, as there are plenty of other resources that do.  [Here](https://blog.engineyard.com/understanding-rack-apps-and-middleware)'s a short intro to get oyur started. In brief, your application's middleware is a chain of smaller apps that handle incoming requests and outbound responses. Requests coming to your Rails application first go through this chain from the outside in, and responses get sent back out the same chain from the inside out.
+I won't go into depth, as there are plenty of other resources that do.  [Here](https://blog.engineyard.com/understanding-rack-apps-and-middleware)'s a short intro to get you started. In brief, your application's middleware is a chain of smaller apps that handle incoming requests and outbound responses. Requests coming to your Rails application first go through this chain from the outside in, and responses get sent back out the same chain from the inside out.
 
 With both incoming requests and outbound responses, any piece of middleware can
 
