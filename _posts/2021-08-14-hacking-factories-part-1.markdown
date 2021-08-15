@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Hacking FactoryBot to build a factory UI"
+title: "Hacking FactoryBot to build a factory UI (1 of 2)"
 description: "Part 1: The main guts of the FactoryBurgers gem"
 date: 2021-08-14 10:00:00 -0400
 comments: true
@@ -53,7 +53,7 @@ So now that you have the User Journey, we'll spend the rest of this post going o
 * How to get around some issues when using FactoryBot outside a immediate tear-down test db environment (*cough* uniqueness validations *cough*).
 * How to allow customization of the display such as you see above: different models display different summary attributes and can even have links to your application's show pages for these resources.
 
-We won't cover the UI (React with very cool animations, thank you very much) or the controllers / middleware that connects the two. Most of the latter was covered in the last post.
+We won't cover the UI (React with very cool animations, thank you very much) or the controllers / middleware that connects the two. Most of the latter was covered in the last post. If you're looking for more context that is in this post, check out the [full codebase](https://github.com/ozydingo/factory_burgers).
 
 ## The Back End
 
@@ -83,11 +83,13 @@ end
 FactoryBurgers::FactoryBotAdapter.load_factories
 ```
 
-Here, `factory_bot_adapter` is a ~premature~ optimistic architecture for allowing this gem to work with different versions of FactoryBot that may have different APIs. To that end, many of the floating methods you see defined here are, in the [full codebase](https://github.com/ozydingo/factory_burgers), defined in version-specific adapters such as `FactoryBurger::FactoryBotAdapter::FactoryBotV6`
+### Loose coupling
+
+A lot of data and methods we're going to deal with will be specific to the version of FactoryBot in use. For example, in FactoryBot 4.0, `FactoryBot.factories` will give you a list of `FactoryBot::Factory` object. In 6.0, you would use `FactoryBot::Internal.factories`. In order to keep our middleware and view well oganized and robust, we'll abstract all of those relevant details into adapter classes. For this post, many of the floating methods you see defined end up living in `FactoryBurger::FactoryBotAdapter::FactoryBotV6`, which is the 6.x-specific adapter. This way, we can define entry point methods such as `FactoryBurgers.factories` without worrying about the version, effectively decoupling the consumer of our back-end code (the middleware) from the specific library and version powering the back-end.
 
 ## Listing Factories
 
-Once we have the above, getting a list of factories is simply
+Once we have the above, getting a list of factories using FactoryBot 6 is simply
 
 ```rb
 def factories
@@ -95,7 +97,7 @@ def factories
 end
 ```
 
-The return value is an Array of `FactoryBot::Factory` objects. That's no good to pass to our front end, so we'll create our own data class that can wrap a `FactoryBot::Factory` for use in our gem. This class will give us some attribute methods that our middleware can use to pass to the front-end. As we've seen, we also want to know what attributes and traits we can use on the factory, so you'll also see the `traits` and `attributes` methods.
+The return value is an Array of `FactoryBot::Factory` objects. We'll wrap that in our own data class for stability. For our purposes, that means providing access to the factory name, model attributes, and factory traits.
 
 ```rb
 module FactoryBurgers
@@ -154,9 +156,7 @@ module FactoryBurgers
 end
 ```
 
-We're using our own data class for factories, and we'll use our own data class for traits and attributes. This way, the middleware can call a set of methods that does not depend on the specific FactoryBot or ActiveRecord version implementation of any of these data.
-
-For attributes, we use `factory.build_class` to get the ActiveRecord class, then call `columns` to get its list of columns. Finally, we reject the primary key, since we don't want to allow the user to specify that in the UI. We wrap each column objecct in our own class:
+We'll do the same for traits and attributes. For attributes, we used `factory.build_class` to get the ActiveRecord class, then called `columns` to get its list of columns. Finally, we reject the primary key, since we don't want to allow the user to specify that in the UI. The data class is define as follows:
 
 ```rb
 module FactoryBurgers
@@ -184,7 +184,7 @@ module FactoryBurgers
 end
 ```
 
-And for traits, we use `factory.definition.defined_traits`, where `factory` is a `FactoryBot::Factory`, and the return value is an array of `FactoryBot::Trait`s.
+To get traits for a factory, we used `factory.definition.defined_traits`, where `factory` is a `FactoryBot::Factory`, and the return value is an array of `FactoryBot::Trait`s. Our data class:
 
 ```rb
 module FactoryBurgers
@@ -212,11 +212,10 @@ module FactoryBurgers
 end
 ```
 
-Both of these are very basic classes whose single responsibility is to encapsulate factory, trait, and attribute information in a manner our middleware can reliable consume.
-
-An example of what these classes give us:
+Both of these are very basic classes whose single responsibility is to encapsulate factory, trait, and attribute information in a manner our middleware can reliably consume. Here's an example.
 
 ```rb
+factory = FactoryBurgers::Introspection.factories.find { |f| f.name == :post }
 pp FactoryBurgers::Models::Factory.new(factory).to_h
 
 {:name=>"post",
@@ -230,9 +229,9 @@ pp FactoryBurgers::Models::Factory.new(factory).to_h
    {:name=>"body"}]}
 ```
 
-These data maps directly into the form inputs that are place on the page when the user selects the "post" factory.
+You can see how each of the items in this data structure map to the form inputs in the screenshots above.
 
-Just to close the loop, when the form gets submitted with factory, traits, and attribute data, we can use FactoryBot to build the requested object using `FactoryBurgers::Builder#build`:
+When the form gets submitted, we use the factory, traits, and attribute data to build the object using `FactoryBurgers::Builder#build`:
 
 ```rb
 def build(factory, traits, attributes)
@@ -244,11 +243,11 @@ This simply maps the data we parse and pass from the middleware to the `create` 
 
 ### Customization
 
-The next cool thing we'll build into the gem is the ability to customize what information we display for each built object. It could quickly become overwhelming to see all attributes of an object, and which attributes are the most usefuil summary is application and use-case specific.
+The next cool feature we'll build into the gem is the ability to customize what information we display for each built object. Notice how our "User" object UI above had a number of useful attributes on display, but "Comment" had only the id. We don't want to overwhelm the user with _all_ attributes of a given object, but we do want to provide any information the developer deems useful.
 
-Out strategy will be to use presenters. We'll construct a presenter base class that application developers can subclass, exactly as Rails provides the base class `ActiveRecord::Base` that can be subclassed. We'll require application developers to register their presenters using one of two forms:
+Our strategy will be to use customizeable presenters. We'll construct a presenter base class that application developers can subclass, exactly as Rails provides the base class `ActiveRecord::Base` that can be subclassed. We'll allow application developers to define their presenters using one of two forms:
 
-1. Reference the presenter class explicitly
+1. Create a class and reference it explicitly
 
     ```rb
     FactoryBurgers::Presenters.present "User", with: FactoryBurgers::Presenters::UserPresenter
@@ -270,7 +269,7 @@ Out strategy will be to use presenters. We'll construct a presenter base class t
     end
     ```
 
-Let's start with the base class. Pay attention to two methods, `attributes` and `link_path`. These methods we will expect developers to override in their subclasses to provide information about what attributes to display, and what if any link to their application to show with the object.
+Let's start by looking at the base presenter class. Two methods, `attributes` and `link_path`, can be overwritten in subclasses to provide information about what attributes to display, and what if any HTML link to show on the object.
 
 ```rb
 module FactoryBurgers
@@ -304,7 +303,7 @@ module FactoryBurgers
 end
 ```
 
-Above, we referenced `FactoryBurgers::Presenters::UserPresenter`. In our test app, this looks like the following, overriding `attributes` and `link_path` as we've described above.
+And an example subclass implementation for `FactoryBurgers::Presenters::UserPresenter` that overrides both `attributes` and `link_path`:
 
 ```rb
 class FactoryBurgers::Presenters::UserPresenter < FactoryBurgers::Presenters::Base
@@ -325,44 +324,35 @@ class FactoryBurgers::Presenters::UserPresenter < FactoryBurgers::Presenters::Ba
 end
 ```
 
-When we put
+The id, name, login, and email attributes are displayed on the UI. We tell FactoryBurgers to use this presenter by putting the following in an initializer file, such as `/config/initializers/factory_burgers.rb`:
 
 ```rb
 FactoryBurgers::Presenters.present "User", with: FactoryBurgers::Presenters::UserPresenter
 ```
 
-in our Rails application initializers (`/config/initializers/factory_burgers.rb`), `FactoryBurgers` is now aware of this presenter, and will use it to display any `User` object.
+{% include post_image.html name="user.png" width="250px" alt="Card with user attributes and an external link" title="user object"%}
 
-{% include post_image.html name="user.png" width="250px" alt="Card with user attributes and an external linke" title="user object"%}
+Notice the link icon next to the title "User"? That uses the `link_path` method we defined. Nice.
 
-Notice the link icon? That uses the `link_path` method we defined. Nice.
+We also showed an anonymous presenter using `FactoryBurgers::Presenters.present("Post") do ... end`. How does this work? At a high level, we use the provided blocks to build an anonymous subclass of `FactoryBurgers::Presenters::Base`, and use that subclass identically to what we described above.
 
-We also showed an anonymous presenter using `FactoryBurgers::Presenters.present("Post") do ... end`. How does this work? First, let's look at the `present` method.
+In order to do this, we'll create a builder class. Here's how it will be called from the `present` method (now would be a good time to review Ruby blocks if you're fuzzy on them!)
 
 ```rb
 def present(klass, with: nil, &blk)
   presenter = with || build_presenter(klass, &blk)
   @presenters[klass.to_s] = presenter
 end
-```
 
-As you can see, if we provide a block instead of a `with` argument, we use the `build_presenter` method. Let's look at that.
-
-```rb
 def build_presenter(klass, &blk)
   PresenterBuilder.new(klass).build(&blk)
 end
 ```
 
-and
-
+So what does the `PresenterBuilder` actually look like? My go-to move for metapgramming with blocks is to inherit from `BasicObject` and define the methods you want developers to use inside the block. Simplified here, that's `attributes` and `link_path`. We also provide a `build` method. Note that we could be more strict and create a separate class for the block evaluation than the `build` method, for a simple DSL with fewer than five methods that was overkill.
 
 ```rb
 module FactoryBurgers
-  # The PresenterBuilder is resposible for building anonymous subclasses of
-  # FactoryBurgers::Presenters::Base when FactoryBurgers::Presenters.present is
-  # called with a block. The block is evaluated in the context of a
-  # FactoryBurgers::PresenterBuilder instance, which understands the DSL.
   class PresenterBuilder < BasicObject
     def initialize(klass)
       @presenter = ::Class.new(::FactoryBurgers::Presenters::Base)
@@ -372,16 +362,6 @@ module FactoryBurgers
     def build(&blk)
       instance_eval(&blk)
       return @presenter
-    end
-
-    def presents(name)
-      @presetner.presents(name)
-    end
-
-    def type(&blk)
-      @presenter.define_method(:type) do
-        blk.call(object)
-      end
     end
 
     def attributes(&blk)
@@ -395,17 +375,13 @@ module FactoryBurgers
         blk.call(object)
       end
     end
+
+    # ... a few other methods including `presents` and `type` ...
   end
 end
 ```
 
-If this is a little too much meta-programming for you, don't worry, it suffices to unuderstand the explicit presenter subclass use case. In brief, we use a class that creates a new anonymous subclass of `FactoryBurgers::Presenters::Base`
-
-```rb
-@presenter = ::Class.new(::FactoryBurgers::Presenters::Base)
-```
-
-It then executes the block passed to `presents`, providing definitions for `attributes` and `link_path` that define the corresponding methods on this new class using `define_method`. Ruby is pretty awesome.
+If this is a little too much meta-programming for you, don't worry about it too much. We're building a subclass of `FactoryBurgers::Presenters::Base` just as we did above. We're just doing it dynamically using code to write our new code, creating a class with `Class.new` and defining methods using `define_method`. Ruby is pretty awesome.
 
 ### Headaches
 
@@ -434,4 +410,16 @@ end
 
 Basically, if you get a invalid record, just try again. The sequence will increment by one, and eventually you'll get a valid record. Yeah, dirty.
 
-There's a craftier solution, but it's a bit involved and so will be the subject of a separate post.
+There's a craftier solution, but it's a bit involved and so will be the subject of a [separate post](/2021/08/14/hacking-factories-part-2.html).
+
+## Wrapping Up (for now)
+
+In this post, we described:
+
+* How we want our UI to function to allow interaction with FactoryBot
+* How to use FactoryBot to discover factories and traits so that we can expose this information to a UI
+* A strategy to decouple our middleware and UI from the specific internals of FactoryBot
+* An approach to easily customizing the display of various factories and objects using a base presenter class developer can inherit from
+* Some cool Ruby metaprogramming to make defining presenters even more convenient
+
+Stay tuned to get even deeper into FactoryBot hackery where we find ourselves holding our breath and diving into non-exposed instance variables in order to work around the sequence x uniqueness validation problem!
