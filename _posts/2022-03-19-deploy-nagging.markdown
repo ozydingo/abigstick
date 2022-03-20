@@ -59,7 +59,7 @@ More specifically, we need the next step to be able to resolve both `production`
 Next, we need to list the commits between `production` and `main`. A simple `git log` will do, with some formatting:
 
 ```
-git log --pretty=format:%s HEAD..${{ github.event.after }}
+git log --pretty=format:%s HEAD..${{'{{'}} github.event.after }}
 ```
 
 Since we checked out `production`, `HEAD` refers to the latest commit on `production`. Note that we can't refer directly to `production` because the checkout action does not appear to fetch branch names. Similarly, we can't reference `main`, but we can use the event data `github.event.after` which will reference the commit on the target branch after the push, aka `main`.
@@ -89,13 +89,13 @@ Without further ado,
 # Replace this with your Slack webhook
 url="https://hooks.slack.com/services/T*****/B*****/*****"
 # Get just the familiar branch name from the ref
-branch_name=$(basename ${{ github.event.ref }})
+branch_name=$(basename ${{'{{'}} github.event.ref }})
 # Construct the compare URL for more information
-compare_url="${{ github.event.repository.url }}/compare/production..$branch_name"
+compare_url="${{'{{'}} github.event.repository.url }}/compare/production..$branch_name"
 # Define a threshold
 threshold=8
 # List all commits between main and production
-commits=$(git log --pretty=format:%s ^HEAD ${{ github.event.after }})
+commits=$(git log --pretty=format:%s HEAD..${{'{{'}} github.event.after }})
 # Count the commits
 count=$(echo "$commits" | wc -l)
 # Trim to the latest three
@@ -144,11 +144,11 @@ jobs:
       - name: Post the commits
         run: |
           url="https://hooks.slack.com/services/T*****/B*****/*****"
-          branch_name=$(basename ${{ github.event.ref }})
-          compare_url="${{ github.event.repository.url }}/compare/production..$branch_name"
+          branch_name=$(basename ${{'{{'}} github.event.ref }})
+          compare_url="${{'{{'}} github.event.repository.url }}/compare/production..$branch_name"
           threshold=8
 
-          commits=$(git log --pretty=format:%s ^HEAD ${{ github.event.after }})
+          commits=$(git log --pretty=format:%s HEAD..${{'{{'}} github.event.after }})
           count=$(echo "$commits" | wc -l)
           latest_three=$(echo "$commits" | head -3)
           commit_list=$(echo "$latest_three" | awk '{ print " - " $$0 }')
