@@ -9,7 +9,7 @@ tags: [rails, rspec, mock, fake, testing]
 
 ## Testing lib code
 
-I'm a frameworks kind of guy, and in my day job I write a lot of code that I want other developers to use in their projects. In a green-field, ideal scenario, I'm writing gems, publishing open source, and dancing with the unicorns of BSD licences and full separation of concerns.
+I'm a frameworks kind of guy, and in my day job I write a lot of code that I want other developers to use in their projects. In a green-field, ideal scenario, I'm writing gems, publishing open source, and dancing with the unicorns of BSD licenses and full separation of concerns.
 
 In reality, a lot of my application-agnostic code is plopped right into the `lib` folder of an application project. After all, is it not decreed that we [avoid hasty abstraction](https://kentcdodds.com/blog/aha-programming)?
 
@@ -17,13 +17,13 @@ This practicality has led to an interesting decision tree around testing. I'm no
 
 I didn't think unicorns could cry, but I might have just made that a reality.
 
-The thing is, coupling my application-agnositc code with application constructs in tests isn't very application agnostic. It makes it hard to actually extract the code come time to do so, and results in fragile tests as the application grows and evolves into something you never would have imagined, hoped for, or feared when you first signed the job offer.
+The thing is, coupling my application-agnostic code with application constructs in tests isn't very application agnostic. It makes it hard to actually extract the code come time to do so, and results in fragile tests as the application grows and evolves into something you never would have imagined, hoped for, or feared when you first signed the job offer.
 
 I needed a better way.
 
 ## Cheap fakes
 
-I'll make a quick stop to mention that the first successful abstraction away from application code was to use very shallow stubs of the classes I needed. So in a piece of code that aimed at standardize data transofmration of a certain kind of class, I just created classes with dummy attributes, and didn't much care about mimicing anything ActiveRecord-like or database-backed beyond that.
+I'll make a quick stop to mention that the first successful abstraction away from application code was to use very shallow stubs of the classes I needed. So in a piece of code that aimed at standardize data transofmration of a certain kind of class, I just created classes with dummy attributes, and didn't much care about mimicking anything ActiveRecord-like or database-backed beyond that.
 
 ```rb
 module SpecSupport
@@ -43,7 +43,7 @@ Sure, these models inherited from `ActiveRecord::Base` by way of `ApplicationRec
 
 ## Flipping the table
 
-The solution above became inadequate when I needed to test an encryption module I was writing. I was writing this because I knew it was available in Rails 7, and I knew we weren't going to migrate to Rails 7 for longer than I could stand seeing keys stored in plain text or with an encryption gem with a 2013 exposed security vulnerability. I needed to test queries write assertions about the data that was saved to the database and not just that which was exposed to the class. (As a sidenote, if you dogmatically never test anything but your class' public interface, but the feature you're writing is specifically designed to foil hackers using nonstandard access and intentionally never exposes these details to your consumers, what gives?)
+The solution above became inadequate when I needed to test an encryption module I was writing. I was writing this because I knew it was available in Rails 7, and I knew we weren't going to migrate to Rails 7 for longer than I could stand seeing keys stored in plain text or with an encryption gem with a 2013 exposed security vulnerability. I needed to test queries write assertions about the data that was saved to the database and not just that which was exposed to the class. (As a side-note, if you dogmatically never test anything but your class' public interface, but the feature you're writing is specifically designed to foil hackers using nonstandard access and intentionally never exposes these details to your consumers, what gives?)
 
 It should be noted that I took inspiration from [this blog post](https://envygeeks.io/blog/2013/06/24/mocking-active-record-to-test-concerns) about creating temporary tables in tests. However, I wanted a few changes:
 
@@ -107,11 +107,11 @@ end
 A few notes from this code.
 
 - For funsies, we're creating a `MockRecord::Base` class that inherit from `ActiveRecord::Base` and is the base class of any created mock record class. This isn't specifically used as of yet, but it seemed like a good idea.
-- The `generate` method simply defines a subclass of this base class, evalutes the block you pass it as if it were written inside a class definition block. This makse the api very similar to authoring a real ActiveRecord class.
+- The `generate` method simply defines a subclass of this base class, evaluates the block you pass it as if it were written inside a class definition block. This makes the api very similar to authoring a real ActiveRecord class.
   - I could have been stricter and kept table naming out of this method, but I wanted to allow this class to be anonymous to avoid declaring global consts inside specs. This means ActiveRecord wouldn't have a convention to use for the table name for each class. Linking it explicitly to the table in the method params seemed a little more intuitive given that requirement that forcing users to use `self.table_name = ...` as you would with custom table naming.
 - I don't love the need to pass `self` in, but this was the only way I could add an `after(:all)` hook automatically without breaking down my module encapsulation.
 
-## Nockery in action
+## Mockery in action
 
 Using this new feature in my encryption module test:
 
@@ -140,11 +140,11 @@ Using this new feature in my encryption module test:
 
 Now I have a real fake ActiveRecord model that uses the real test database, allowing me to write my specs to ensure that I was in fact storing encrypted data transparently to users of any class, and I could test this using a class that wasn't tied to any application concern.
 
-When it comes time to extract this into a gem, well, I won't, beucase Rails 7 already has that covered.
+When it comes time to extract this into a gem, well, I won't, because Rails 7 already has that covered.
 
 ## Postscript: testing the testing utility
 
-What's nice about writing a test helper is that testing the test helper can be done in a file that's actually colocated with the helper itself. I can test a few sanity-checking behaviors, such as the ability to query my fake model (example above)
+What's nice about writing a test helper is that testing the test helper can be done in a file that's actually collocated with the helper itself. I can test a few sanity-checking behaviors, such as the ability to query my fake model (example above)
 
 ```rb
   it "queries like any ActiveRecord model" do
