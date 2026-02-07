@@ -29,7 +29,7 @@ const { posts, currentPage, totalPages } = Astro.props;
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
-      const href = `/${year}/${month}/${day}/${slug}.html`;
+      const href = `/${year}/${month}/${day}/${slug}`;
       const formattedDate = date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
@@ -64,7 +64,7 @@ const { posts, currentPage, totalPages } = Astro.props;
   <nav class="mt-12 flex justify-center gap-2">
     {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
       const isCurrent = page === currentPage;
-      const href = page === 1 ? '/' : `/page/${page}.html`;
+      const href = page === 1 ? '/' : `/page/${page}`;
       return isCurrent ? (
         <span class="px-3 py-1 rounded bg-[var(--color-brand)] text-white text-sm">{page}</span>
       ) : (

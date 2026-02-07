@@ -20,7 +20,7 @@ const sortedTags = [...tagCounts.entries()].sort((a, b) => b[1] - a[1]);
   <div class="flex flex-wrap gap-3">
     {sortedTags.map(([tag, count]) => (
       <a
-        href={`/tags/${tag}.html`}
+        href={`/tags/${tag}`}
         class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--color-brand-light)] text-[var(--color-brand)] rounded-lg no-underline hover:bg-[var(--color-brand)] hover:text-white transition-colors"
       >
         {tag}

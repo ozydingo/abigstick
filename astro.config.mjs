@@ -8,10 +8,6 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   site: 'http://www.abigstick.com',
   integrations: [react(), sitemap()],
-  build: {
-    format: 'file',
-  },
-  trailingSlash: 'never',
   vite: {
     plugins: [tailwindcss()],
   },
