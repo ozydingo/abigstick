@@ -10,3 +10,11 @@
   --color-text-light: #666;
   --color-border: #e0e0e0;
 }
+
+/* Reset inline code styles inside syntax-highlighted code blocks */
+.prose pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
