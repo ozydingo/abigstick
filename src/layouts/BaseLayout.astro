@@ -1,0 +1,58 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+const siteTitle = 'A Big Stick';
+const fullTitle = title === siteTitle ? title : `${title} | ${siteTitle}`;
+const metaDescription = description || 'Speak softly and carry a big stick: "The exercise of intelligent forethought and of decisive action sufficiently far in advance of any likely crisis."';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={metaDescription} />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Raleway:wght@400;600;700&display=swap" rel="stylesheet" />
+    <title>{fullTitle}</title>
+  </head>
+  <body class="bg-white text-[var(--color-text)] font-sans min-h-screen flex flex-col">
+    <header class="sticky top-0 z-50 bg-gray-900/90 backdrop-blur-sm border-b border-gray-800">
+      <div class="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
+        <a href="/" class="font-heading text-xl font-bold text-white hover:text-gray-300 transition-colors no-underline">
+          A Big Stick
+        </a>
+        <nav class="flex gap-6">
+          <a href="/about.html" class="text-gray-300 hover:text-white transition-colors text-sm no-underline">About</a>
+          <a href="/tags.html" class="text-gray-300 hover:text-white transition-colors text-sm no-underline">Tags</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="flex-1 max-w-3xl mx-auto px-6 py-10 w-full">
+      <slot />
+    </main>
+
+    <footer class="border-t border-[var(--color-border)] mt-16">
+      <div class="max-w-3xl mx-auto px-6 py-8 text-sm text-[var(--color-text-light)]">
+        <div class="flex flex-col sm:flex-row justify-between gap-4">
+          <div>
+            <span class="font-heading font-semibold text-[var(--color-text)]">A Big Stick</span>
+            <span class="ml-2">by Andrew H Schwartz</span>
+          </div>
+          <div>
+            <a href="mailto:fetch@andrewhschwartz.com" class="hover:text-[var(--color-brand)] transition-colors">fetch@andrewhschwartz.com</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
