@@ -1,5 +1,0 @@
-DOING
- - Tag filter pages
-BACKLOG
- - Rake task to publish
- - Rake task to create a new tag filter page

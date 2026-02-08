@@ -1,8 +1,8 @@
 build:
-	JEKYLL_ENV=production bundle exec jekyll build
+	npm run build
 
 publish: build
-	gsutil -m rsync -edru _site/ gs://www.abigstick.com
+	gsutil -m rsync -edru dist/ gs://www.abigstick.com
 
 server:
-	bundle exec jekyll serve
+	npm run dev

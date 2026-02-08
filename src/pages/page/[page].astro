@@ -1,0 +1,83 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+  const perPage = 10;
+  const posts = (await getCollection('blog'))
+    .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+  const totalPages = Math.ceil(posts.length / perPage);
+
+  return Array.from({ length: totalPages - 1 }, (_, i) => ({
+    params: { page: String(i + 2) },
+    props: {
+      posts: posts.slice((i + 1) * perPage, (i + 2) * perPage),
+      currentPage: i + 2,
+      totalPages,
+    },
+  }));
+}
+
+const { posts, currentPage, totalPages } = Astro.props;
+---
+
+<BaseLayout title={`Page ${currentPage} | A Big Stick`}>
+  <ul class="space-y-8 list-none p-0">
+    {posts.map((post: any) => {
+      const slug = post.id.replace(/^\d{4}-\d{2}-\d{2}-/, '');
+      const date = post.data.date;
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const href = `/${year}/${month}/${day}/${slug}`;
+      const formattedDate = date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+
+      return (
+        <li>
+          <a href={href} class="block group no-underline">
+            <time class="text-sm text-[var(--color-text-light)]" datetime={date.toISOString()}>
+              {formattedDate}
+            </time>
+            <h2 class="font-heading text-xl font-semibold mt-1 group-hover:text-[var(--color-brand)] transition-colors">
+              {post.data.title}
+            </h2>
+            <p class="text-[var(--color-text-light)] mt-1">{post.data.description}</p>
+          </a>
+          {post.data.tags.length > 0 && (
+            <div class="flex flex-wrap gap-1.5 mt-2">
+              {post.data.tags.map((tag: string) => (
+                <a
+                  href={`/tags/${tag.toLowerCase()}`}
+                  class="inline-block px-2 py-0.5 bg-[var(--color-brand-light)] text-[var(--color-brand)] rounded text-xs no-underline hover:bg-[var(--color-brand)] hover:text-white transition-colors"
+                >
+                  {tag}
+                </a>
+              ))}
+            </div>
+          )}
+        </li>
+      );
+    })}
+  </ul>
+
+  <nav class="mt-12 flex justify-center gap-2">
+    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+      const isCurrent = page === currentPage;
+      const href = page === 1 ? '/' : `/page/${page}`;
+      return isCurrent ? (
+        <span class="px-3 py-1 rounded bg-[var(--color-brand)] text-white text-sm">{page}</span>
+      ) : (
+        <a
+          href={href}
+          class="px-3 py-1 rounded border border-[var(--color-border)] text-sm hover:bg-gray-100 transition-colors no-underline"
+        >
+          {page}
+        </a>
+      );
+    })}
+  </nav>
+</BaseLayout>

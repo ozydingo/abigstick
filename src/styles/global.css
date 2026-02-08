@@ -1,0 +1,20 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --font-sans: "Lato", sans-serif;
+  --font-heading: "Raleway", sans-serif;
+  --color-brand: #4a4a8a;
+  --color-brand-light: #eef;
+  --color-text: #333;
+  --color-text-light: #666;
+  --color-border: #e0e0e0;
+}
+
+/* Reset inline code styles inside syntax-highlighted code blocks */
+.prose pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
