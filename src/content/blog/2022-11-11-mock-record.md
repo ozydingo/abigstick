@@ -21,7 +21,7 @@ I needed a better way.
 
 ## Cheap fakes
 
-I'll make a quick stop to mention that the first successful abstraction away from application code was to use very shallow stubs of the classes I needed. So in a piece of code that aimed at standardize data transofmration of a certain kind of class, I just created classes with dummy attributes, and didn't much care about mimicking anything ActiveRecord-like or database-backed beyond that.
+I'll make a quick stop to mention that the first successful abstraction away from application code was to use very shallow stubs of the classes I needed. So in a piece of code that aimed at standardize data transformation of a certain kind of class, I just created classes with dummy attributes, and didn't much care about mimicking anything ActiveRecord-like or database-backed beyond that.
 
 ```rb
 module SpecSupport
@@ -41,7 +41,7 @@ Sure, these models inherited from `ActiveRecord::Base` by way of `ApplicationRec
 
 ## Flipping the table
 
-The solution above became inadequate when I needed to test an encryption module I was writing. I was writing this because I knew it was available in Rails 7, and I knew we weren't going to migrate to Rails 7 for longer than I could stand seeing keys stored in plain text or with an encryption gem with a 2013 exposed security vulnerability. I needed to test queries write assertions about the data that was saved to the database and not just that which was exposed to the class. (As a side-note, if you dogmatically never test anything but your class' public interface, but the feature you're writing is specifically designed to foil hackers using nonstandard access and intentionally never exposes these details to your consumers, what gives?)
+The solution above became inadequate when I needed to test an encryption module I was writing. I was writing this because I knew it was available in Rails 7, and I knew we weren't going to migrate to Rails 7 for longer than I could stand seeing keys stored in plain text or with an encryption gem with a 2013 exposed security vulnerability. I needed to test queries, write assertions about the data that was saved to the database and not just that which was exposed to the class. (As a side-note, if you dogmatically never test anything but your class' public interface, but the feature you're writing is specifically designed to foil hackers using nonstandard access and intentionally never exposes these details to your consumers, what gives?)
 
 It should be noted that I took inspiration from [this blog post](https://envygeeks.io/blog/2013/06/24/mocking-active-record-to-test-concerns) about creating temporary tables in tests. However, I wanted a few changes:
 
@@ -163,7 +163,7 @@ That the table exists during the test
 And that the table is dropped afterwards, by writing a test that runs afterwards.
 
 ```rb
-describe "MockerRecord ::after" do
+describe "MockRecord ::after" do
   it "destroys the temporary table" do
     expect { ActiveRecord::Base.connection.execute(MockRecord::TEST_QUERY) }.to raise_error(
       ActiveRecord::StatementInvalid,

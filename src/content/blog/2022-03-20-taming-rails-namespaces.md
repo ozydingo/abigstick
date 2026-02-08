@@ -1,6 +1,6 @@
 ---
 title: "Taming Rails Namespaces"
-description: "What to do when you application outgrows your framework"
+description: "What to do when your application outgrows your framework"
 date: 2022-03-20 10:18:00 -0400
 tags: [rails, organization, patterns]
 ---
@@ -16,7 +16,7 @@ A codebase I work on has long outgrown the standard Rails scaffolding framework.
   - Some of these folders serve as _both_ Rails namespaces _and_ autoload paths, a situation that has led to many hard-to-discover bugs in development.
 - 173 top-level files in `lib` and 52 subfolders, again a combination of namespaces and autoload paths
 
-Understanding that our codebase is a proud monolith with no inttentions of microservicing, the major downsides of this sprawl include:
+Understanding that our codebase is a proud monolith with no intentions of microservicing, the major downsides of this sprawl include:
 
 - Uncertainty where to place additional code
   - This lead to default “easy” choices such as bloating models or putting a new file at the top-level of `lib` – a self-reinforcing positive feedback loop of sprawl!
@@ -45,15 +45,15 @@ If you disagree or even have the slightest of reservations about these tenets, l
 
 ## What is a "feature"?
 
-Naming things is hard. Here, I'm using "feature" o broadly describe a grouping of code / behavior / functitonality that related to a coherent conncept in your business domain. For example, a retailer might group code into `Advertsiing`, `Sales`, `Returns`, and `Promotions`. It's an art, and the level of granularity depends on the breadth of your application and business, and the needs of your developers.
+Naming things is hard. Here, I'm using "feature" to broadly describe a grouping of code / behavior / functionality that relates to a coherent concept in your business domain. For example, a retailer might group code into `Advertising`, `Sales`, `Returns`, and `Promotions`. It's an art, and the level of granularity depends on the breadth of your application and business, and the needs of your developers.
 
-This concept goes by other names, including "interest", "conern", "domain", and others.
+This concept goes by other names, including "interest", "concern", "domain", and others.
 
 ## A quick refresher on Rails' const lookups
 
 - Rails ships with a few default "autoload paths", including `app/models`, `app/controllers`, and others.
 - You can configure additional [autoload paths](https://guides.rubyonrails.org/autoloading_and_reloading_constants.html) in `config/application.rb`
-- Any folder under an autload path can be used to implicitly name a module used as a namespace.
+- Any folder under an autoload path can be used to implicitly name a module used as a namespace.
   - For example, with no modification to your application configuration, a const `Foo::Bar` could be defined in `app/models/foo/bar.rb`.
 
 ## How to structure non-MVC business logic
@@ -74,7 +74,7 @@ That way, `app/features/foo/bar.rb` easily defines the `Foo::Bar` class as a mem
 
 Using the above structure is great for obviously non-MVC code but doesn't solve the problems above such as a sprawling `models` folder that would make even the surest suburban planner raise their hands up in despair and move to a shack in the country.
 
-The problem is that the more we dive into elements of an opnionated framework (ahem Rails), the more we have to work to make sure our system jives with the framework. For example:
+The problem is that the more we dive into elements of an opinionated framework (ahem Rails), the more we have to work to make sure our system jives with the framework. For example:
 
 - ActiveRecord models are backed by a table name corresponding to the model name
 - Controllers for a model named baz are expected to be named bazs_controller
@@ -90,11 +90,11 @@ These conventions can often be overridden. Doing so begins to violate one of Rai
 
 The rest of this document will explore the ways in which we can pivot from Rails' original conventions to achieve our goals and how they rate on the “don’t fight your framework” scale.
 
-## Components requires by our application
+## Components required by our application
 
 ### Business Logic
 
-As mentioned above, organizing business logic (referring to non-MVC code) using our own conventions is easy. This is because Rails, as opinionated as it is, has no opinions about business logic. So we simply add folders names by feature in `app/features`, such as `app/features/bar.rb` to define a class `Foo::Bar`.
+As mentioned above, organizing business logic (referring to non-MVC code) using our own conventions is easy. This is because Rails, as opinionated as it is, has no opinions about business logic. So we simply add folders named by feature in `app/features`, such as `app/features/bar.rb` to define a class `Foo::Bar`.
 
 - Framework-fighting score: 0 out of 10.
 
@@ -208,7 +208,7 @@ Pushing further, we’ve expressed a desire to co-locate as many related code fi
 
 ### Views
 
-View templates don’t really have modules in the same way as models and controllers do, but they do follow the same structure as models and controllers. However, the default expectation is still that view templates are located in `app/views`. Within this constraint, we can define `app/views/foo/bazs/index.html` and so on. This doesn’t achieve code co-location, but it is probably a reasonable compromise as views ought to be relatively simple templates and/or isolated from the back-end implementation. This applies especially true as more UI gets offloaded to statically-generated assets such as a React front-end.
+View templates don’t really have modules in the same way as models and controllers do, but they do follow the same structure as models and controllers. However, the default expectation is still that view templates are located in `app/views`. Within this constraint, we can define `app/views/foo/bazs/index.html` and so on. This doesn’t achieve code co-location, but it is probably a reasonable compromise as views ought to be relatively simple templates and/or isolated from the back-end implementation. This is especially true as more UI gets offloaded to statically-generated assets such as a React front-end.
 
 - Fighting your framework score: 1 out of 10.
 
@@ -259,9 +259,9 @@ Here, MVC support refers to constructs such as helpers and presenters – anythi
 
 Application-agnostic code includes everything from custom-built string parsing functions to full-blown should-be-a-gem frameworks for profiling code, reporting metrics, running complex workflows, and so on. The key is that this code is application-agnostic – it doesn’t belong to the application core nor any of its features. This code rightfully belongs in the `lib` folder of a Rails application (or on rubygems.org) Note that we have used and abused `lib` as a combination of application agnostic code, pseudo-application-agnostic code, rake tasks, a nascent version of the app/features structure proposed here, and much more. For that reason, specific to our application or similar bloated legacy applications, a simple `lib2` for a fresh start can be used to maintain a clean namespace for new, truly application-agnostic code.
 
-### Applicaiton base classes and core
+### Application base classes and core
 
-Base classes and core refers to things like your base `ApplicationRecord` and `ApplicationController`, or graphql controller or base types, and other similar base classes and common across your app but sepcific to your app core behavior.
+Base classes and core refers to things like your base `ApplicationRecord` and `ApplicationController`, or graphql controller or base types, and other similar base classes and common across your app but specific to your app core behavior.
 
 I like to put this in `app/core`, and add that as one more application autoload path. Add nested modules as you see fit, such as `app/core/graphql_types` to contain the somewhat large number of base classes and types you need to define for graphql.
 

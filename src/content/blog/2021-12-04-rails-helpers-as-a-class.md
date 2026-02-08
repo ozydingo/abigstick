@@ -1,6 +1,6 @@
 ---
 title: "Rails helpers as a class"
-description: "How to use Rails' helper methods useable outside of ActionView"
+description: "How to use Rails' helper methods usable outside of ActionView"
 date: 2021-12-04 21:09:00 -0400
 tags: [rails, ruby, OOP]
 ---
@@ -22,7 +22,7 @@ helper.number_to_currency(1.234)
 # => "$1.23"
 ```
 
-Generally speaking, you'll use these in views. That's why Rails put them in view helpers. But run an app long enough, and you'll find places you need these elsewhere. Maybe you have another with another service or API and need to use the sanitization or other helpers in a back-end task. Maybe you're building static assets that aren't presented by Rails views.
+Generally speaking, you'll use these in views. That's why Rails put them in view helpers. But run an app long enough, and you'll find places you need these elsewhere. Maybe you have an integration with another service or API and need to use the sanitization or other helpers in a back-end task. Maybe you're building static assets that aren't presented by Rails views.
 
 When such needs have come up, I've seen folks take the path of the Dark Side and simply include the needed helpers in ActiveRecord models or other classes. For example, `include ActionView::Helpers::NumberHelper`. This is a poster violation of "composition over inheritance" and the Single Responsibility Principle, and is generally asking for namespace collisions as you just pile more and more mixins into your model.
 
@@ -50,7 +50,7 @@ But that `new` is bugging me. We can do better.
 
 ### Method 2: create a module function that extends the helper
 
-Tip: this method doesn't work reliable
+Tip: this method doesn't work reliably
 
 I'd like to be able to ditch `new` and simply call `SanitizeHelper.sanitize(...)`. This looks like a module function pattern, so let's try that. First I'll do it with an example that works:
 
@@ -88,7 +88,7 @@ So we've hit a wall with module functions. Next!
 
 ### Method 3: Delegating singletons
 
-We'll combine the two approaches, and use a class that has class methods that simply call the equivalent method on an instance. By doing this, we get the convenience of a class method, but we don't break with the underlying implementation expects there to be a class.
+We'll combine the two approaches, and use a class that has class methods that simply call the equivalent method on an instance. By doing this, we get the convenience of a class method, but we don't break when the underlying implementation expects there to be a class.
 
 This sounds like a Singleton pattern, so we'll use that too. If you're not familiar with Ruby's Singleton, you could replace `instance` with `new` and the effect would be the same.
 
@@ -196,6 +196,6 @@ ApplicationController.helpers.sanitize("<script>alert('hello')</script>Totally i
 # => "alert('hello')Totally innocent"
 ```
 
-## Warpping up
+## Wrapping up
 
 In this post, we build wrappers around ActionView helpers to isolate them for reuse. We built an easy way to do this for an arbitrary helper module using the `RailsHelperAsAClass` base class. Then we discovered that we have access to a class instance with all of these methods anyway, so we should probably just use that. Still, we had fun, didn't we?

@@ -34,7 +34,7 @@ end
 Code:
 
 ```rb
-ApplicationRecord.connected_to(role: "reading") do
+ApplicationRecord.connected_to(role: :reading) do
   ... code here connects to your configured replica ...
 end
 ```
@@ -94,7 +94,7 @@ There's a significant hitch. The battled Rails developer will have felt the red 
 There are two issues we will have to wrestle, all dealing with how any given `ReadOnly` subclass is supposed to act identically to its superclass as far as query generation.
 
 1. Our `ReadOnly` subclass is not another STI type, and the `ReadOnly` name should not be used in the query
-2. What class should should be used to instantiate a record of a `ReadOnly` class?
+2. What class should be used to instantiate a record of a `ReadOnly` class?
 
 The first problem with #1 is immediately evident in any generated query. Here, the SQL engine looks for a record with type `EditJob::ReadOnly`, but no such records exist.
 
@@ -164,7 +164,7 @@ Job::ReadOnly.all.to_sql
 # => "SELECT `jobs`.* FROM `jobs` WHERE `jobs`.`type` = 'Job'"
 ```
 
-As we illustrated above, our fix tells ActiveRecord to use `Job` and not `Job::ReadOnly` in the query constraint. However, in this case, we want _no constraints_, just like im our base class. The way ActiveRecord decides this is via the `descends_from_active_record?` method, which returns `true` for the base class and `false` for every other class.
+As we illustrated above, our fix tells ActiveRecord to use `Job` and not `Job::ReadOnly` in the query constraint. However, in this case, we want _no constraints_, just like in our base class. The way ActiveRecord decides this is via the `descends_from_active_record?` method, which returns `true` for the base class and `false` for every other class.
 
 So, once again, we will use the superclass method.
 
@@ -184,7 +184,7 @@ There's one more case to consider. We've solved for the base class and concrete 
 
 ```rb
 ManualJob.all.to_sql
-# => "SELECT `jobs`.* FROM `jobs` WHERE `jobs`.`type` IN ('ManualJob', 'ManualJob', 'EditJob', 'EditJob', 'AuditJob' 'AuditJob')"
+# => "SELECT `jobs`.* FROM `jobs` WHERE `jobs`.`type` IN ('ManualJob', 'ManualJob', 'EditJob', 'EditJob', 'AuditJob', 'AuditJob')"
 ManualJob::ReadOnly.all.to_sql
 => "SELECT `jobs`.* FROM `jobs` WHERE `jobs`.`type` = 'ManualJob'"
 ```
@@ -200,7 +200,7 @@ Both issues are solved with the same solution: override the `type_condition` met
     # Same as original
     sti_column = table[inheritance_column]
     # Grab descendants from superclass instead of self, remove dups
-    sti_names = [superclass] + superclass.descendants.map(&:sti_name).uniq
+    sti_names = ([superclass] + superclass.descendants).map(&:sti_name).uniq
     # Same as original
     predicate_builder.build(sti_column, sti_names)
   end
@@ -230,7 +230,7 @@ class ApplicationRecord < ActiveRecord::Base
   # ReadOnly subclass of STI models
   module HiddenFromSTI
     # Use same STI name as superclass (`type` field value in the table)
-    # The allows `Foo::Readonly` to load records with sty type `"Foo"`
+    # The allows `Foo::Readonly` to load records with STI type `"Foo"`
     delegate :sti_name, to: :superclass
 
     # ActiveRecord will not add type conditions to the base class. It does this via
@@ -281,7 +281,7 @@ class ApplicationRecord < ActiveRecord::Base
 end
 ```
 
-Now, our availble jobs index can construct a replica-bound jobs query while writing other models
+Now, our available jobs index can construct a replica-bound jobs query while writing other models
 
 ```rb
 jobs = Job::ReadOnly.available
@@ -293,7 +293,7 @@ but we can confirm we're connected to the replica configuration by attempting an
 
 ```rb
 jobs.update_all(name: "bar")
-# !!! ActiveRecord::ReadOnlyError (Write query attempted while in readonly mode: UPDATE `jobs` SET `jobs`.`name` = 'bar' WHERE `jobs`.`type` IN ('Job', 'ManualJob', 'EditJob', 'AudiJob') AND `jobs`.`state` = 'available')
+# !!! ActiveRecord::ReadOnlyError (Write query attempted while in readonly mode: UPDATE `jobs` SET `jobs`.`name` = 'bar' WHERE `jobs`.`type` IN ('Job', 'ManualJob', 'EditJob', 'AuditJob') AND `jobs`.`state` = 'available')
 ```
 
 Copy that.

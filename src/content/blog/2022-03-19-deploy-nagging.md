@@ -9,13 +9,13 @@ tags: [CI, CD, slack, github]
 
 A lot of shops have a CI/CD pipeline set up so that merges to the main branch trigger checks, tests, and, if everything passes, automatic deployment.
 
-I work in a shop that does not. Moving to CD is a north star goal, but it's so baked into our process and our culture that merges to `main` do _not_ trigger automatic deployment that simply making it so could have some pretty bad implications. Still, we are gorwing to a size where we can't just rely on [good intentions](https://www.linkedin.com/pulse/good-intentions-dont-work-mechanisms-do-jv-roig/) providing a reasonable deploy cadence so some poor level 1 engineer isn't stuck with a list of 37 commits on their first attempt at a production deploy.
+I work in a shop that does not. Moving to CD is a north star goal, but it's so baked into our process and our culture that merges to `main` do _not_ trigger automatic deployment that simply making it so could have some pretty bad implications. Still, we are growing to a size where we can't just rely on [good intentions](https://www.linkedin.com/pulse/good-intentions-dont-work-mechanisms-do-jv-roig/) providing a reasonable deploy cadence so some poor level 1 engineer isn't stuck with a list of 37 commits on their first attempt at a production deploy.
 
 So we're going to build a low-lift, low-maintenance, intermediate solution. We'll post a nag to Slack whenever we have more than N commits on `main` that have not yet been deployed. In our process, we can count undeployed commits by simply comparing `main` to an automatically updated branch called `production`. We'll use N = 8.
 
 ## The Slack webhook
 
-One of the requirements of this project is no additional infrastructure to manage. This means avoiding writing up any data storage, and secrets mangement, and the like. We're going to use the dead simple [Slack Webhooks](https://slack.com/help/articles/115005265063-Incoming-webhooks-for-Slack) to post messages.
+One of the requirements of this project is no additional infrastructure to manage. This means avoiding writing up any data storage, and secrets management, and the like. We're going to use the dead simple [Slack Webhooks](https://slack.com/help/articles/115005265063-Incoming-webhooks-for-Slack) to post messages.
 
 ## Github actions
 
@@ -76,7 +76,7 @@ We want to do a bit more than just post the commits every time. So let's write a
 
 - Format the commit list
 - Count the commits
-- Only post the latest few commits to not overwhlem the Slack channel
+- Only post the latest few commits to not overwhelm the Slack channel
 - Add a link to the github compare URL for the full list / more information
 - Format the Slack message
 - Only post the Slack message if the commit count is above a threshold
@@ -111,7 +111,7 @@ Latest commits include:
 $commit_list
 - ... <$compare_url|but wait, there's more!> ..."
 
-# Log it in the github action ouutput for debugging
+# Log it in the github action output for debugging
 echo "$message"
 
 # If over the threshold, post $message to the webhook!
@@ -119,7 +119,7 @@ echo "$message"
   curl -X POST -H 'Content-type: application/json' --data "{\"text\":\"$message\"}" "$url"
 ```
 
-### Puutting it all together
+### Putting it all together
 
 Finally, our github action file, at `/.github/workflows/prod_divergence.yml`, looks like this
 

@@ -13,7 +13,7 @@ In a [previous post](/2022/04/03/cron-tasks-as-interactors.html) I described a f
 0-55/5 * * * * lockrun ./do_some_destructive_polling
 ```
 
-where `do_some_destructive_polling` might, for example, loop over some external integration's data modifying its state, and this code is not safe to run multiple instances at once. Such an overlap might occur if (a) a single run happens to take longer than 5 minutes, causing the next invocation to overlap, or (b) any other process such as a manual admin intervention might launch another instnace of this task.
+where `do_some_destructive_polling` might, for example, loop over some external integration's data modifying its state, and this code is not safe to run multiple instances at once. Such an overlap might occur if (a) a single run happens to take longer than 5 minutes, causing the next invocation to overlap, or (b) any other process such as a manual admin intervention might launch another instance of this task.
 
 `lockrun` is a common way in a crontask to ensure that the second run just quits (default behavior) to allow the existing run to continue. You can of course configure the behavior on conflict, but this is the simplest and often desired behavior.
 
@@ -21,7 +21,7 @@ where `do_some_destructive_polling` might, for example, loop over some external 
 
 In the previous article I described how we were moving our cron tasks to be runnable Ruby interactors so that we could run this load on a scalable, distributed background job processing system (Resque, in our case). This presents two challenges:
 
-- Since we're in ruby, we dont' have access to `lockrun` unless we shell out and then enter back into Ruby. This is a bit clunky.
+- Since we're in ruby, we don't have access to `lockrun` unless we shell out and then enter back into Ruby. This is a bit clunky.
 - Since the tasks may run on one of any number of servers, the locking mechanism cannot be file-system based, as it is with `lockrun`, but instead must be shared across all instances.
 
 A central database is an obvious choice for the second concern. Which database? For two main reasons I immediately pointed at Redis over SQL:
