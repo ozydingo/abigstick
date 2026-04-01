@@ -25,7 +25,7 @@ Don't ask for more than this before starting. Get a draft down.
 
 ## Voice
 
-- **First person.** "I built", "I found", "I'm a frameworks kind of guy."
+- **First person, with "we" for team work.** Use "I" for personal opinions, preferences, and individual discoveries ("I found", "I favor", "I'm a frameworks kind of guy"). Use "we" and "our" when describing work done with a team ("we built", "our codebase", "we discovered"). Don't attribute team work to yourself alone.
 - **Opinionated and direct.** State preferences without hedging. "I hate `method_missing` for this." "Personally, I find this much cleaner."
 - **Self-aware humor.** Dry wit, occasional self-deprecation. Light touch — not a comedy blog.
 - **Conversational but precise.** Informal sentence rhythm, but technically exact. Don't round up or hand-wave.
