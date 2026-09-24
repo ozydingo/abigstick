@@ -9,15 +9,19 @@ Hey, could you review this for me real quick?
 
 ![A pull request summary: 56 files changed, +14,822 −200](/images/posts/review-tax/pr-changes.png "56 files changed, +14,822 −200")
 
-This is a real example. And we're all seeing this more and more. Agents make it easy to write _a lot_ (not just code -- plans, designs, architecture docs, documentation all count). More folks are empowered to work on large slices. It's human nature to rubber stamp something in front of you that looks "good enough" and throw something over the wall.
+This is a real example. And we're all seeing this more and more. Agents make it easy to write _a lot_ (not just code — plans, designs, architecture docs, documentation all count). More folks are empowered to work on large slices. It's human nature to rubber-stamp something in front of you that looks "good enough" (including what your agent hands you) and throw it over the wall — placing the burden of de-slopping the output on everyone else.
 
-All of this compounds the same problem: we're swamped with review busywork and not really doing them right. People skim, miss key details, and feel overwhelmed -- reviewing not-quite-there reasoning produced by an agent that didn't quite have the right context is a *lot* more taxing than reviewing a well-honed argument or proposal. Combine the increased cognitive load per sentence with the massively increased number of sentence and frequency of outputs to be reviewed, and the problem is blatantly obvious.
+All of these tendencies compound the same problem: we're swamped with review busywork and not really reviewing well. People skim, miss key details, and feel overwhelmed — reviewing not-quite-there reasoning produced by an agent that didn't quite have the right context is a _lot_ more taxing than reviewing a well-honed argument or proposal. The increased cognitive load per sentence compounds with the massively increased number of sentences and the frequency of outputs to be reviewed.
 
-A lot of teams are leaning more heavily on agentic code review, and I fully support that. But, alone, that solution misses a deeper point. Real review that challenges and generates _shared understanding_ remains a critical part of a healthy SDLC and a health team culture. It's a valid position that more complex code outputs at a faster velocity are a new norm, and we puny humans can't possibly keep up. But my position isn't about code review. It's about reviewing _at the right level_. You've heard it said: no one reviews compiled bit code anymore, and that's a good thing.
+My position isn't about code review. It's about reviewing _at the right level_. Granted, the more complex code outputs produced at a faster velocity are a new norm, and we puny humans can't possibly keep up. A lot of teams are leaning more heavily on agentic code review, and I fully support that. But, alone, that solution misses a deeper point. Real review that both challenges and generates _shared understanding_ remains a critical part of a healthy SDLC and a healthy team culture.
 
-Here's the thing. Code reviews were already broken. Architecture reviews were already taxed. Most people simply aren't very good at, or very motivated to, taking the time and effort to really guide your reviewers through what you're asking them to do. To communicate simply, distill a concise yet thorough outline, and progressively disclose the detail needed for an effective, delightful review. This is the skill that we need to develop to separate our work as a team from generic AI slop.
+You've heard it said: no one reviews compiled bytecode anymore; the more meaningful level of review became the source code. With agents, the design and system constraints are the new source. They are what allow your team to understand what you are trying to build (you agency-granted, agent-enabled developer you). They are what set the multi-day agentic loops off on a charted course. Both of these roles are why these documents should be written thoughtfully and reviewed carefully, with understanding and meaning behind every word. Hot take: write the core of them yourself, manually; if you can't, think about what that means.
 
-To that end, I gave this position statement to my team. Within days I witnessed it producing enthusiastic support and engaged review meetings. Take a read; it won't take you long ;-)
+This discipline requires taking the time and effort to really guide your reviewers through what you're asking them to do. It requires communicating simply and clearly, distilling a concise yet thorough outline, and progressively disclosing the detail needed for an effective, delightful review. This is a skill that we need to develop to separate our work as a team from a generic AI slop factory.
+
+To that end, I gave this position statement to my team. Within days I witnessed it producing enthusiastic support and engaged review meetings, including one with a new hire who cut their design doc by more than half, from about 3,000 words to 1,150, adding north stars and diagrams along the way. The rewrite passed review with some of our more skeptical, clarity-seeking team members.
+
+Take a read; it won't take you long ;-)
 
 <div class="not-prose my-10 rounded-lg border border-[var(--color-border)] bg-[var(--color-brand-light)]/40 p-6 md:p-8">
   <p class="mb-4 text-xs font-heading uppercase tracking-wide text-[var(--color-text-light)]">
@@ -57,5 +61,3 @@ To that end, I gave this position statement to my team. Within days I witnessed 
   <p class="mb-0">Solving these problems <em>and</em> cranking the dial on build speed are not mutually exclusive. Both are accomplished using the same principle, already stated above:</p>
   <p class="font-semibold mt-2 mb-0">Align most often at the earliest, highest levels.</p>
 </div>
-
-If you skimmed the preamble looking for the 14k-line PR and jumped straight past it to see what happened — yeah. That's kind of the point.
