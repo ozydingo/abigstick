@@ -17,7 +17,7 @@ My position isn't about code review. It's about reviewing _at the right level_. 
 
 You've heard it said: no one reviews compiled bytecode anymore; the more meaningful level of review became the source code. With agents, the design and system constraints are the new source. They are what allow your team to understand what you are trying to build (you agency-granted, agent-enabled developer you). They are what set the multi-day agentic loops off on a charted course. Both of these roles are why these documents should be written thoughtfully and reviewed carefully, with understanding and meaning behind every word.
 
-Hot take: write the core of them yourself. If you can't, think about what that means.
+Hot take: write the core of your design yourself. If you can't, think about what that means.
 
 This discipline requires taking the time and effort to really guide your reviewers through what you're asking them to do. It requires communicating simply and clearly, distilling a concise yet thorough outline, and progressively disclosing the detail needed for an effective, delightful review. This is a skill that we need to develop to separate our work as a team from a generic AI slop factory.
 
